@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Salesforce Compliance Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --dp: #2B093C;
+    --mp: #65289D;
+    --bv: #4D73D4;
+    --lg: #E8E9EE;
+    --inv: #C0392B;
+    --ov: #2980B9;
+    --pipe: #27AE60;
+    --multi: #8E44AD;
+    --bg: #F7F6FA;
+    --card: #FFFFFF;
+    --border: #E2E0EA;
+    --text: #1A1028;
+    --muted: #6B6080;
+    --chip-bg: #EDE8F5;
+    --chip-text: #4A2375;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--dp);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-badge {
+    background: var(--mp);
+    color: #fff;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .header h1 {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .header-date {
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* LAYOUT */
+  .main { max-width: 1280px; margin: 0 auto; padding: 24px 28px 48px; }
+
+  /* FILTER BAR */
+  .filter-bar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  .filter-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .filter-bar select, .filter-bar input[type=search] {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    min-width: 140px;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--mp); }
+  .filter-bar input[type=search] { min-width: 180px; }
+
+  .btn-reset {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--mp);
+    background: var(--chip-bg);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    margin-left: auto;
+  }
+  .btn-reset:hover { background: #D9CFEE; }
+
+  /* TAB NAV */
+  .tab-nav {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 6px;
+    width: fit-content;
+  }
+  .tab-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tab-btn.active {
+    background: var(--dp);
+    color: #fff;
+  }
+  .tab-btn:hover:not(.active) { background: var(--lg); color: var(--text); }
+
+  /* KPI TILES */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .kpi-card.total::before { background: var(--dp); }
+  .kpi-card.invalid::before { background: var(--inv); }
+  .kpi-card.overdue::before { background: var(--ov); }
+  .kpi-card.pipeline::before { background: var(--pipe); }
+  .kpi-card.multi::before { background: var(--multi); }
+
+  .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 6px; }
+  .kpi-value { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); line-height: 1; margin-bottom: 6px; }
+  .kpi-delta { font-size: 11px; font-family: 'DM Mono', monospace; }
+  .kpi-delta.up { color: var(--inv); }
+  .kpi-delta.down { color: #16A34A; }
+  .kpi-delta.flat { color: var(--muted); }
+
+  /* CHART SECTION */
+  .chart-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .chart-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .chart-legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .chart-wrap { position: relative; height: 240px; }
+
+  /* TWO COL */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .bar-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+  }
+  .bar-section .chart-wrap { height: 200px; }
+
+  /* DATA TABLE */
+  .table-section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .table-title { font-size: 14px; font-weight: 600; }
+  .table-count { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  .data-table { width: 100%; border-collapse: collapse; }
+  .data-table th {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-align: left;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .data-table th:hover { color: var(--dp); }
+  .data-table th .sort-arrow { opacity: 0.4; margin-left: 4px; }
+  .data-table th.sorted .sort-arrow { opacity: 1; }
+
+  .data-table td {
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table tr:hover td { background: #FAF8FD; }
+
+  .pill {
+    display: inline-flex; align-items: center;
+    font-size: 11px; font-weight: 600;
+    padding: 2px 8px; border-radius: 20px;
+    margin: 1px 2px; white-space: nowrap;
+  }
+  .pill.inv { background: #FDECEA; color: #922B21; }
+  .pill.ov  { background: #EAF2FB; color: #1A5276; }
+  .pill.pipe { background: #EAFAF1; color: #1E8449; }
+  .pill.multi { background: #F3EEFF; color: #6B21A8; }
+
+  .channel-tag {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--chip-text);
+    background: var(--chip-bg);
+    border-radius: 4px;
+    padding: 2px 7px;
+    white-space: nowrap;
+  }
+
+  .week-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .flag-count {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--dp);
+  }
+
+  /* PAGINATION */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .page-btns { display: flex; gap: 4px; }
+  .page-btn {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .page-btn:hover:not(:disabled) { background: var(--chip-bg); border-color: var(--mp); }
+  .page-btn.active { background: var(--dp); color: #fff; border-color: var(--dp); }
+  .page-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* MANAGER VIEW */
+  .manager-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .manager-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .manager-card:hover { border-color: var(--mp); box-shadow: 0 2px 12px rgba(101,40,157,0.1); }
+  .manager-card.expanded { border-color: var(--dp); }
+  .manager-name { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .manager-stats { display: flex; gap: 12px; margin-bottom: 8px; }
+  .manager-stat { font-size: 11px; color: var(--muted); }
+  .manager-stat span { font-weight: 600; color: var(--text); }
+  .manager-bars { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+  .manager-bar-row { display: flex; align-items: center; gap: 8px; }
+  .manager-bar-label { font-size: 10px; color: var(--muted); width: 50px; text-align: right; flex-shrink: 0; }
+  .manager-bar-track { flex: 1; height: 5px; background: var(--lg); border-radius: 3px; overflow: hidden; }
+  .manager-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .manager-rep-list { margin-top: 12px; display: none; border-top: 1px solid var(--border); padding-top: 10px; }
+  .manager-card.expanded .manager-rep-list { display: block; }
+  .manager-rep { font-size: 12px; padding: 3px 0; color: var(--muted); display: flex; justify-content: space-between; }
+  .manager-rep strong { color: var(--text); }
+
+  /* HIDDEN */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* TREND TABLE */
+  .trend-table { width: 100%; border-collapse: collapse; }
+  .trend-table th {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--muted);
+    text-align: left; padding: 10px 16px;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  .trend-table td {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .trend-table tr:last-child td { border-bottom: none; }
+  .trend-table tr.latest td { font-weight: 600; }
+
+  .delta-pos { color: var(--inv); font-family: 'DM Mono', monospace; font-size: 11px; }
+  .delta-neg { color: #16A34A; font-family: 'DM Mono', monospace; font-size: 11px; }
+  .delta-flat { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 11px; }
+
+  /* FOOTER */
+  .footer { text-align: center; padding: 20px; color: var(--muted); font-size: 11px; }
+
+  /* REP TRENDS */
+  .trend-toggle {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px; font-weight: 500;
+    padding: 6px 14px; border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card); color: var(--muted);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .trend-toggle.active { background: var(--dp); color: #fff; border-color: var(--dp); }
+  .trend-toggle:hover:not(.active) { background: var(--chip-bg); color: var(--text); }
+
+  .rep-trend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+  .rep-trend-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .rep-trend-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .rep-trend-card.risk::before { background: var(--inv); }
+  .rep-trend-card.improving::before { background: var(--pipe); }
+  .rep-trend-card.neutral::before { background: var(--muted); }
+
+  .rep-trend-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .rep-trend-meta { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+
+  .sparkline-row {
+    display: flex; gap: 4px; align-items: center; margin-bottom: 10px;
+  }
+  .spark-week {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    flex: 1;
+  }
+  .spark-dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; font-family: 'DM Mono', monospace;
+    flex-shrink: 0;
+  }
+  .spark-dot.flagged-multi { background: #FDECEA; color: var(--inv); border: 1.5px solid var(--inv); }
+  .spark-dot.flagged-single { background: #FEF9EC; color: #B7770D; border: 1.5px solid #F0A500; }
+  .spark-dot.clean { background: #EAFAF1; color: var(--pipe); border: 1.5px solid var(--pipe); }
+  .spark-dot.absent { background: var(--lg); color: var(--muted); border: 1.5px solid var(--border); }
+  .spark-label { font-size: 8px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  .trend-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .trend-stat-pill {
+    font-size: 11px; font-weight: 500;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2px 9px;
+    color: var(--muted);
+  }
+  .trend-stat-pill strong { color: var(--text); }
+
+  .trend-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .trend-badge.risk { background: #FDECEA; color: #922B21; }
+  .trend-badge.improving { background: #EAFAF1; color: #1E8449; }
+  .rep-trend-card.neutral::before { background: #F0A500; }
+  .trend-badge.neutral { background: #FEF3DC; color: #8A5C00; }
+  .trend-badge.clean { background: #EAF0FD; color: #1A4FAF; }
+
+  .no-results-msg {
+    grid-column: 1/-1; text-align: center;
+    padding: 48px; color: var(--muted); font-size: 14px;
+  }
+
+  @media (max-width: 600px) {
+    .rep-trend-grid { grid-template-columns: 1fr; }
+  }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .main { padding: 16px; }
+    .header { padding: 14px 16px; }
+    .kpi-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Salesforce Compliance Dashboard</h1>
+  </div>
+  <div class="header-date" id="lastUpdated">Data as of Jul 6, 2026</div>
+</div>
+
+<div class="main">
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <div class="filter-group">
+      <span class="filter-label">Week</span>
+      <select id="filterWeek">
+        <option value="all">All weeks</option>
+        <option value="11" selected>Jul 6 (latest)</option>
+        <option value="10">Jun 26</option>
+        <option value="9">Jun 19</option>
+        <option value="8">Jun 11</option>
+        <option value="7">May 28</option>
+        <option value="6">May 22</option>
+        <option value="5">May 14</option>
+        <option value="4">May 6</option>
+        <option value="3">Apr 23</option>
+        <option value="2">Apr 16</option>
+        <option value="1">Apr 9</option>
+        <option value="0">Apr 2</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Channel</span>
+      <select id="filterChannel">
+        <option value="all">All channels</option>
+        <option value="Field West">Field West</option>
+        <option value="Field East">Field East</option>
+        <option value="Inside">Inside</option>
+        <option value="Majors">Majors</option>
+        <option value="Client Partner">Client Partner</option>
+        <option value="AccuTrade">AccuTrade</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Role</span>
+      <select id="filterRole">
+        <option value="all">All roles</option>
+        <option value="Account Executive">Account Executive</option>
+        <option value="Business Development">Business Development</option>
+        <option value="Client Partner">Client Partner</option>
+        <option value="AccuTrade">AccuTrade</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Manager</span>
+      <select id="filterManager">
+        <option value="all">All managers</option>
+      </select>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Search rep</span>
+      <input type="search" id="filterRep" placeholder="Type a name…">
+    </div>
+    <button class="btn-reset" onclick="resetFilters()">Reset filters</button>
+  </div>
+
+  <!-- CONTEXTUAL BANNER -->
+  <div id="contextBanner" style="display:none; background:#EAF0FD; border:1px solid #B8CCF5; border-radius:8px; padding:10px 16px; margin-bottom:16px; display:none; align-items:flex-start; gap:10px;">
+    <span style="font-size:16px; flex-shrink:0; margin-top:1px;">ⓘ</span>
+    <div style="font-size:13px; color:#1A3A6B; line-height:1.5;" id="contextBannerText"></div>
+  </div>
+
+  <!-- TAB NAV -->
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" onclick="switchTab('trends')">Trends</button>
+    <button class="tab-btn" onclick="switchTab('reps')">Rep detail</button>
+    <button class="tab-btn" onclick="switchTab('managers')">By manager</button>
+    <button class="tab-btn" onclick="switchTab('rep-trends')">Rep trends</button>
+  </div>
+
+  <!-- OVERVIEW TAB -->
+  <div id="tab-overview" class="tab-panel active">
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="chart-section">
+      <div class="chart-header">
+        <span class="chart-title">Flagged reps over time</span>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--dp)"></span>Total</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--ov)"></span>Overdue</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--pipe)"></span>Pipeline</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--inv)"></span>Invalid</span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="trendChart" role="img" aria-label="Line chart of weekly compliance trends"></canvas></div>
+    </div>
+
+    <div class="two-col">
+      <div class="bar-section">
+        <div class="chart-header"><span class="chart-title">By sales group</span></div>
+        <div class="chart-wrap"><canvas id="channelChart" role="img" aria-label="Bar chart by sales group"></canvas></div>
+      </div>
+      <div class="bar-section">
+        <div class="chart-header"><span class="chart-title">By role</span></div>
+        <div class="chart-wrap"><canvas id="roleChart" role="img" aria-label="Bar chart by role"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRENDS TAB -->
+  <div id="tab-trends" class="tab-panel">
+    <div class="chart-section">
+      <div class="chart-header">
+        <span class="chart-title">Full trend history — all 6 weeks</span>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot" style="background:var(--dp)"></span>Total flagged</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--ov)"></span>Overdue</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--pipe)"></span>Pipeline</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--inv)"></span>Invalid</span>
+          <span class="legend-item"><span class="legend-dot" style="background:var(--multi)"></span>Multi-flag</span>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:280px"><canvas id="fullTrendChart" role="img" aria-label="Full 6-week trend chart"></canvas></div>
+    </div>
+
+    <div class="table-section">
+      <div class="table-header">
+        <span class="table-title">Week-over-week summary</span>
+        <span class="table-count" id="trendNote"></span>
+      </div>
+      <table class="trend-table" id="trendTable"></table>
+    </div>
+  </div>
+
+  <!-- REPS TAB -->
+  <div id="tab-reps" class="tab-panel">
+    <div class="table-section">
+      <div class="table-header">
+        <span class="table-title">Rep detail</span>
+        <span class="table-count" id="repCount"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="repTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('rep')">Rep <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('week')">Week <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('channel')">Channel <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('role')">Role <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('manager')">Manager <span class="sort-arrow">↕</span></th>
+              <th onclick="sortTable('flags')">Violations</th>
+              <th onclick="sortTable('count')">Flag count <span class="sort-arrow">↕</span></th>
+            </tr>
+          </thead>
+          <tbody id="repBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span id="pageInfo"></span>
+        <div class="page-btns" id="pageBtns"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANAGERS TAB -->
+  <div id="tab-managers" class="tab-panel">
+    <div id="managerGrid" class="manager-grid"></div>
+  </div>
+
+  <!-- REP TRENDS TAB -->
+  <div id="tab-rep-trends" class="tab-panel">
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap;">
+      <div style="font-size:13px; color:var(--muted);">Scoring based on all weeks of data · Filters for channel, role, and manager apply</div>
+      <div style="margin-left:auto; display:flex; gap:8px;">
+        <button class="trend-toggle active" id="toggleAtRisk" onclick="setTrendView('risk')">⚠ Needs attention</button>
+        <button class="trend-toggle" id="toggleMonitoring" onclick="setTrendView('monitoring')">◉ Monitoring</button>
+        <button class="trend-toggle" id="toggleImproving" onclick="setTrendView('improving')">✓ Moving right direction</button>
+        <button class="trend-toggle" id="toggleClean" onclick="setTrendView('clean')">★ Clean record</button>
+        <button class="trend-toggle" id="toggleAll" onclick="setTrendView('all')">All reps</button>
+      </div>
+    </div>
+
+    <!-- SCORING LEGEND -->
+    <div style="margin-bottom: 20px;">
+      <button onclick="toggleLegend()" id="legendToggleBtn" style="font-family:'DM Sans',sans-serif; font-size:12px; font-weight:500; color:var(--mp); background:var(--chip-bg); border:none; border-radius:6px; padding:6px 14px; cursor:pointer; display:flex; align-items:center; gap:6px;">
+        <span id="legendArrow" style="font-size:10px;">▶</span> How are reps scored?
+      </button>
+      <div id="legendPanel" style="display:none; margin-top:10px; background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px 20px; display:none;">
+        <div style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:12px;">Scoring guide</div>
+        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap:12px;">
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="font-size:16px; flex-shrink:0;">⚠</span>
+            <div>
+              <div style="font-size:13px; font-weight:600; color:var(--inv); margin-bottom:3px;">Needs Attention</div>
+              <div style="font-size:12px; color:var(--muted); line-height:1.5;">Appeared on the report in at least 2 of the last 3 weeks, or has shown up 4+ times overall with multiple violation types or consecutive weeks on the list.</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="font-size:16px; flex-shrink:0;">◉</span>
+            <div>
+              <div style="font-size:13px; font-weight:600; color:#8A5C00; margin-bottom:3px;">Monitoring</div>
+              <div style="font-size:12px; color:var(--muted); line-height:1.5;">Has appeared on the report recently but not frequently enough to establish a clear pattern. Worth keeping an eye on.</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="font-size:16px; flex-shrink:0;">✓</span>
+            <div>
+              <div style="font-size:13px; font-weight:600; color:var(--pipe); margin-bottom:3px;">Moving Right Direction</div>
+              <div style="font-size:12px; color:var(--muted); line-height:1.5;">Was on the report earlier in the program but hasn't appeared in the last 3 weeks. Trend is heading in the right direction.</div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px; align-items:flex-start;">
+            <span style="font-size:16px; flex-shrink:0;">★</span>
+            <div>
+              <div style="font-size:13px; font-weight:600; color:#1A4FAF; margin-bottom:3px;">Clean Record</div>
+              <div style="font-size:12px; color:var(--muted); line-height:1.5;">Has not appeared on the compliance report at any point since tracking began in April.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="repTrendGrid"></div>
+  </div>
+
+</div>
+
+<div class="footer">Salesforce Compliance Dashboard · Cars Commerce RSO</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────────
+const WEEKS = ['Apr 2','Apr 9','Apr 16','Apr 23','May 6','May 14','May 22','May 28','Jun 11','Jun 19','Jun 26','Jul 6'];
+// flags bitmask: 1=invalid, 2=overdue, 4=pipeline, 8=eae
+// [weekIdx, rep, channel, role, manager, flagsBitmask]
+const RAW = [[0,"Al Hern","Inside","Business Development","Tim Philbin",5],[0,"Alison Becker","Majors","Account Executive","Chris Reno",7],[0,"Alivia Brigman","Field East","Account Executive","Jessica Smith",4],[0,"Allan Leitch","Field West","Account Executive","Nicholas Tomshack",4],[0,"Andie Berthiaume","Field West","Account Executive","Kelly Chapman",5],[0,"Anna Loerke","Inside","Account Executive","Angela Kleinman",4],[0,"Annemarie Gusmano","Field East","Account Executive","Kevin Lerner",6],[0,"Anthony Gizzi","Field East","Account Executive","Trish Baldwin",7],[0,"Anthony Smihal","Majors","Account Executive","Evan Ross",11],[0,"April Schenk","Field East","Client Partner","John David Scozzaro",1],[0,"Arthur Carina","Majors","Account Executive","Preyas Patel",9],[0,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",7],[0,"Austin Vander Zanden","Majors","Account Executive","Alison Workman",6],[0,"Becky Fajardo","Field East","Account Executive","Kevin Lerner",6],[0,"Ben Grinold","Majors","Account Executive","Preyas Patel",10],[0,"Brandon Bartels","Inside","Account Executive","Kim Gilliam",7],[0,"Brandon Haywood","Inside","Business Development","Tim Philbin",6],[0,"Brendan Miller","Inside","Account Executive","Matt Wick",7],[0,"Brian Wirth","Field West","Account Executive","Ramsey Weber",4],[0,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",5],[0,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[0,"Bryan Deker","Majors","Account Executive","Alison Workman",4],[0,"Bryan Mand","Field East","Account Executive","Jessica Smith",6],[0,"Caitlin Correa","Majors","Account Executive","Damien Mollere",6],[0,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",7],[0,"Cassie Berry","Majors","Account Executive","Alison Workman",7],[0,"Christina Wells","Field West","Account Executive","Nicholas Tomshack",7],[0,"Christopher Juarez","Field East","Account Executive","Heather Johnson",7],[0,"Clare Ulmer","Field East","Account Executive","Jessica Smith",6],[0,"Courtney Corning","Inside","Client Partner","Jay Boehm",1],[0,"Courtney Phillips","Majors","Account Executive","Damien Mollere",7],[0,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",7],[0,"Curt Grigas","Field West","Account Executive","Ramsey Weber",4],[0,"Danielle McJunkins","Majors","Account Executive","Alison Workman",11],[0,"Darren Whitelock","Field East","Account Executive","Michelle McGinnis",4],[0,"David Kogan","Inside","Business Development","Tim Philbin",6],[0,"David Taylor","Inside","Business Development","Tim Philbin",6],[0,"Deanna Sikora","Majors","Account Executive","Damien Mollere",6],[0,"Demi Westfall","Field West","Account Executive","John Kitson",4],[0,"Derek Smith","Inside","Business Development","Ben Renner",6],[0,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",4],[0,"Donald Burbach","Field East","Account Executive","Trish Baldwin",5],[0,"Dori Cooper","Field West","Account Executive","John Kitson",6],[0,"Eamon Eager","Majors","Account Executive","Damien Mollere",10],[0,"Eileen Patterson","Field East","Account Executive","Trish Baldwin",5],[0,"Emily Bassett","Field West","Account Executive","Harry Kammholz",5],[0,"Emma Dudak","Inside","Account Executive","Matt Wick",6],[0,"Eric Ideman","Field West","Account Executive","Kelly Chapman",5],[0,"Gabriel Gomez","Majors","Account Executive","Preyas Patel",10],[0,"Gene Werley","Inside","Account Executive","Matt Wick",6],[0,"Gregory Carnes","Field West","Account Executive","John Kitson",6],[0,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[0,"Heidi Kukoly","Field East","Account Executive","Jessica Smith",6],[0,"Jacob Galonska","Majors","Account Executive","Evan Ross",4],[0,"Jason Pittack","Majors","Account Executive","Evan Ross",7],[0,"Jeff Topor","Field West","Account Executive","Nicholas Tomshack",7],[0,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",7],[0,"Jeffrey Loots","Majors","Account Executive","Preyas Patel",6],[0,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",6],[0,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",7],[0,"Jenny Aburto","Field West","Account Executive","Harry Kammholz",5],[0,"Jihsaan Johnson","Majors","Account Executive","Evan Ross",8],[0,"JJ Sciacca","Field East","Account Executive","Ian McDonald",6],[0,"John Russell","Inside","Business Development","Tim Philbin",7],[0,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",6],[0,"Jory Leaver","Inside","Business Development","Ben Renner",6],[0,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",6],[0,"Joseph Gizzi","Field West","Account Executive","Nicholas Tomshack",7],[0,"Joseph Loan","Field East","Account Executive","Ian McDonald",7],[0,"Joseph McGrath","Field East","Account Executive","Jessica Smith",5],[0,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",6],[0,"Julia Snyder","Majors","Account Executive","Damien Mollere",11],[0,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",6],[0,"Justin Maddux","Majors","Account Executive","Chris Reno",11],[0,"Kamani Smith","Inside","Account Executive","Angela Kleinman",7],[0,"Karen (Dean) Bowling","Field West","Account Executive","John Kitson",5],[0,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",7],[0,"Karyn Coyle","Majors","Account Executive","Damien Mollere",10],[0,"Kegan Portillo","Inside","Account Executive","Matt Wick",6],[0,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",6],[0,"Kevin Delph","Field East","Account Executive","Kevin Lerner",7],[0,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",5],[0,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",7],[0,"Landry Tidwell","Field East","Account Executive","Jessica Smith",5],[0,"Lauren Hughes","Field West","Account Executive","Harry Kammholz",5],[0,"Lauren Szara","Inside","Account Executive","Matt Wick",7],[0,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[0,"Lois Windsor","Field East","Account Executive","Trish Baldwin",7],[0,"Lori Watson","Majors","Account Executive","Damien Mollere",6],[0,"Maria Graves","Field East","Account Executive","Kevin Lerner",7],[0,"Marissa Cannato","Field West","Account Executive","Nicholas Tomshack",7],[0,"Mark Baum","Field East","Account Executive","Jessica Smith",6],[0,"Martin Maiorano","Majors","Account Executive","Damien Mollere",7],[0,"Matt Goff","Field West","Account Executive","Harry Kammholz",5],[0,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[0,"Melissa Ott","Inside","Account Executive","Angela Kleinman",6],[0,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",5],[0,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",5],[0,"Michael Balzano","Majors","Account Executive","Chris Reno",6],[0,"Michael Leary","Majors","Account Executive","Preyas Patel",1],[0,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[0,"Michael Schroeder","Majors","Account Executive","Damien Mollere",7],[0,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",6],[0,"Michelle Brinton","Field West","Account Executive","John Kitson",7],[0,"Michelle Heath","Field West","Account Executive","John Kitson",7],[0,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",7],[0,"Mohammad Alam","Inside","Client Partner","Jay Boehm",1],[0,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",6],[0,"Niall Fenton","Majors","Account Executive","Evan Ross",10],[0,"Nicholas Thomas","Field East","Account Executive","Kevin Lerner",7],[0,"Nicholas Villani","Field East","Account Executive","Ian McDonald",7],[0,"Nicole Berry","Field West","Account Executive","Kelly Chapman",5],[0,"Nicole Sojda","Inside","Account Executive","Angela Kleinman",7],[0,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",5],[0,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",6],[0,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",6],[0,"Paul Craig","Inside","Account Executive","Kim Gilliam",6],[0,"Paul Madeano","Field West","Account Executive","Nicholas Tomshack",4],[0,"Paul Zetlmeisl","Field East","Account Executive","Trish Baldwin",6],[0,"Richard Pacheco","Inside","Business Development","Tim Philbin",7],[0,"Rob Sassa","Majors","Account Executive","Preyas Patel",6],[0,"Rob Storey","Field East","Account Executive","Kevin Lerner",5],[0,"Ryan Scarborough","Field East","Account Executive","Jessica Smith",6],[0,"Samantha Siemiawski","Field East","Account Executive","Kevin Lerner",5],[0,"Sara Sanchez","Majors","Account Executive","Alison Workman",6],[0,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",5],[0,"Scott Bechtloff","Field West","Account Executive","Kelly Chapman",5],[0,"Sean Eager","Field East","Account Executive","Trish Baldwin",4],[0,"Shane King","Field West","Account Executive","John Kitson",6],[0,"Shannon Boone","Inside","Business Development","Ben Renner",6],[0,"Sharla Koob","Field East","Account Executive","Michelle McGinnis",6],[0,"Shelby Hill","Field East","Account Executive","Ian McDonald",7],[0,"Shelly Keith","Field West","Account Executive","John Kitson",7],[0,"Sonia Lara","Field West","Account Executive","Harry Kammholz",5],[0,"Steve Williams","Inside","Business Development","Ben Renner",7],[0,"Steven Gerchen","Majors","Account Executive","Evan Ross",6],[0,"Tammy Mersino","Inside","Business Development","Ben Renner",6],[0,"Teddy Blumberg","Majors","Account Executive","Evan Ross",7],[0,"Timothy Leong","Field West","Account Executive","Harry Kammholz",5],[0,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",6],[0,"Tracey Pecci","Majors","Account Executive","Alison Workman",10],[0,"Valerie Citro-Geraci","Field West","Account Executive","Ramsey Weber",5],[0,"Victoria Rolland","Inside","Account Executive","Matt Wick",6],[0,"Waverly Jordan","Inside","Business Development","Tim Philbin",7],[0,"Zach Corbin","Field West","Account Executive","Nicholas Tomshack",5],[1,"Al Hern","Inside","Business Development","Tim Philbin",6],[1,"Alivia Brigman","Field East","Account Executive","Jessica Smith",5],[1,"Allan Leitch","Field West","Account Executive","Nicholas Tomshack",4],[1,"Anthony Gizzi","Field East","Account Executive","Trish Baldwin",5],[1,"Anthony Smihal","Majors","Account Executive","Evan Ross",8],[1,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[1,"Brandon Bartels","Inside","Account Executive","Kim Gilliam",5],[1,"Brendan Miller","Inside","Account Executive","Matt Wick",5],[1,"Brian Wirth","Field West","Account Executive","Ramsey Weber",5],[1,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[1,"Bryan Deker","Majors","Account Executive","Alison Workman",5],[1,"Bryan Mand","Field East","Account Executive","Jessica Smith",6],[1,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",6],[1,"Cassie Berry","Majors","Account Executive","Alison Workman",5],[1,"Christina Wells","Field West","Account Executive","Nicholas Tomshack",5],[1,"Clare Ulmer","Field East","Account Executive","Jessica Smith",6],[1,"Courtney Phillips","Majors","Account Executive","Damien Mollere",5],[1,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",7],[1,"Darren Whitelock","Field East","Account Executive","Michelle McGinnis",4],[1,"David Taylor","Inside","Business Development","Tim Philbin",6],[1,"Deanna Sikora","Majors","Account Executive","Damien Mollere",4],[1,"Demi Westfall","Field West","Account Executive","John Kitson",4],[1,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",4],[1,"Donald Burbach","Field East","Account Executive","Trish Baldwin",4],[1,"Emily Bassett","Field West","Account Executive","Harry Kammholz",5],[1,"Emma Dudak","Inside","Account Executive","Matt Wick",6],[1,"Gabriel Gomez","Majors","Account Executive","Preyas Patel",10],[1,"Gregory Carnes","Field West","Account Executive","John Kitson",6],[1,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",7],[1,"Heidi Kukoly","Field East","Account Executive","Jessica Smith",4],[1,"Jacob Galonska","Majors","Account Executive","Evan Ross",4],[1,"James Roberts","Inside","Business Development","Tim Philbin",4],[1,"Jason Pittack","Majors","Account Executive","Evan Ross",4],[1,"Jeff Topor","Field West","Account Executive","Nicholas Tomshack",5],[1,"Jeffrey Loots","Majors","Account Executive","Preyas Patel",6],[1,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",6],[1,"Jenny Aburto","Field West","Account Executive","Harry Kammholz",5],[1,"Jihsaan Johnson","Majors","Account Executive","Evan Ross",8],[1,"John Russell","Inside","Business Development","Tim Philbin",7],[1,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",6],[1,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",4],[1,"Joseph Gizzi","Field West","Account Executive","Nicholas Tomshack",5],[1,"Joseph Loan","Field East","Account Executive","Ian McDonald",4],[1,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",6],[1,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",6],[1,"Justin Maddux","Majors","Account Executive","Chris Reno",9],[1,"Kamani Smith","Inside","Account Executive","Angela Kleinman",7],[1,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",7],[1,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[1,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",5],[1,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",7],[1,"Landry Tidwell","Field East","Account Executive","Jessica Smith",4],[1,"Lauren Hughes","Field West","Account Executive","Harry Kammholz",5],[1,"Lauren Szara","Inside","Account Executive","Matt Wick",5],[1,"Lois Windsor","Field East","Account Executive","Trish Baldwin",5],[1,"Lori Watson","Majors","Account Executive","Damien Mollere",4],[1,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[1,"Matt Goff","Field West","Account Executive","Harry Kammholz",5],[1,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",4],[1,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",5],[1,"Michael Balzano","Majors","Account Executive","Chris Reno",4],[1,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[1,"Michael Schroeder","Majors","Account Executive","Damien Mollere",4],[1,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",6],[1,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[1,"Niall Fenton","Majors","Account Executive","Evan Ross",8],[1,"Nicholas Villani","Field East","Account Executive","Ian McDonald",4],[1,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",5],[1,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",7],[1,"Paul Craig","Inside","Account Executive","Kim Gilliam",5],[1,"Paul Madeano","Field West","Account Executive","Nicholas Tomshack",4],[1,"Richard Pacheco","Inside","Business Development","Tim Philbin",5],[1,"Rob Storey","Field East","Account Executive","Kevin Lerner",4],[1,"Ryan Scarborough","Field East","Account Executive","Jessica Smith",6],[1,"Samantha Biafore","Inside","Business Development","Tim Philbin",4],[1,"Samantha Siemiawski","Field East","Account Executive","Kevin Lerner",4],[1,"Scott Bechtloff","Field West","Account Executive","Kelly Chapman",5],[1,"Sean Eager","Field East","Account Executive","Trish Baldwin",4],[1,"Shane King","Field West","Account Executive","John Kitson",6],[1,"Shannon Boone","Inside","Business Development","Ben Renner",6],[1,"Shelby Hill","Field East","Account Executive","Ian McDonald",5],[1,"Shelly Keith","Field West","Account Executive","John Kitson",7],[1,"Sonia Lara","Field West","Account Executive","Harry Kammholz",5],[1,"Timothy Leong","Field West","Account Executive","Harry Kammholz",5],[1,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",4],[1,"Tracey Pecci","Majors","Account Executive","Alison Workman",8],[1,"Valerie Citro-Geraci","Field West","Account Executive","Ramsey Weber",4],[1,"Waverly Jordan","Inside","Business Development","Tim Philbin",7],[2,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",4],[2,"Al Hern","Inside","Business Development","Tim Philbin",2],[2,"Alexis Stimac","Field West","Account Executive","Ramsey Weber",4],[2,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",4],[2,"Anthony Gizzi","Field East","Account Executive","Trish Baldwin",1],[2,"Anthony Smihal","Majors","Account Executive","Evan Ross",1],[2,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[2,"Austin Vander Zanden","Majors","Account Executive","Preyas Patel",4],[2,"Becky Fajardo","Field East","Account Executive","Kevin Lerner",4],[2,"Brendan Miller","Inside","Account Executive","Matt Wick",1],[2,"Brian Wirth","Field West","Account Executive","Ramsey Weber",5],[2,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",4],[2,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",3],[2,"Bryan Deker","Majors","Account Executive","Preyas Patel",5],[2,"Bryan Mand","Field East","Account Executive","Trish Baldwin",6],[2,"Caitlin Correa","Majors","Account Executive","Damien Mollere",4],[2,"Carly Ewen","Field West","Account Executive","Ramsey Weber",4],[2,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",6],[2,"Cassie Berry","Majors","Account Executive","Peter Mosca",5],[2,"Christina Wells","Field West","Account Executive","Nicholas Tomshack",1],[2,"Christopher Dinh","Field East","Account Executive","Ian McDonald",4],[2,"Christopher Juarez","Field East","Account Executive","Rebecca Jenkins",3],[2,"Courtney Phillips","Majors","Account Executive","Damien Mollere",1],[2,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",2],[2,"Curt Grigas","Field West","Account Executive","Ramsey Weber",4],[2,"Danielle McJunkins","Majors","Account Executive","Peter Mosca",1],[2,"Darren Whitelock","Field East","Account Executive","Rebecca Jenkins",4],[2,"David Taylor","Inside","Business Development","Tim Philbin",2],[2,"Deanna Sikora","Majors","Account Executive","Damien Mollere",4],[2,"Derek Tardanico","Field East","Account Executive","Ian McDonald",4],[2,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",1],[2,"Emma Dudak","Inside","Account Executive","Matt Wick",2],[2,"Gabriella Price","Field East","Account Executive","Kevin Lerner",4],[2,"Gene Werley","Inside","Account Executive","Matt Wick",4],[2,"Gerard Bednash","Field East","Account Executive","Trish Baldwin",4],[2,"Gillian Zucker","Majors","Account Executive","Chris Reno",1],[2,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",3],[2,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[2,"Jack Bianciotto","Field West","Account Executive","Ramsey Weber",4],[2,"Jarrod Cromwell","Field West","Account Executive","Ramsey Weber",4],[2,"Jason Pittack","Majors","Account Executive","Evan Ross",5],[2,"Jeff Topor","Field West","Account Executive","Nicholas Tomshack",1],[2,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[2,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",4],[2,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",4],[2,"Jenny Aburto","Field West","Account Executive","Harry Kammholz",1],[2,"Jerry Hansen","Field East","Account Executive","Ian McDonald",4],[2,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",4],[2,"John Russell","Inside","Business Development","Tim Philbin",3],[2,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",6],[2,"Jordan Gedik","Majors","Account Executive","Evan Ross",4],[2,"Jory Leaver","Inside","Business Development","Ben Renner",4],[2,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",5],[2,"Joseph Gizzi","Field West","Account Executive","Nicholas Tomshack",1],[2,"Joseph Loan","Field East","Account Executive","Ian McDonald",1],[2,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",4],[2,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",6],[2,"Justin Maddux","Majors","Account Executive","Chris Reno",1],[2,"Kamani Smith","Inside","Account Executive","Angela Kleinman",4],[2,"Karen (Dean) Bowling","Field West","Account Executive","Ramsey Weber",4],[2,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",1],[2,"Kegan Portillo","Inside","Account Executive","Matt Wick",4],[2,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[2,"Kimberly Norman","Inside","Account Executive","Ben Renner",2],[2,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",1],[2,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",7],[2,"Landry Tidwell","Field East","Account Executive","Michelle McGinnis",4],[2,"Lauren Hughes","Field West","Account Executive","Harry Kammholz",1],[2,"Lauren Szara","Inside","Account Executive","Matt Wick",5],[2,"Lisa Rubin","Inside","Business Development","Tim Philbin",4],[2,"Lori Watson","Majors","Account Executive","Damien Mollere",5],[2,"Luciana Raspanti","Majors","Account Executive","Evan Ross",1],[2,"Maria Graves","Field East","Account Executive","Kevin Lerner",5],[2,"Marissa Cannato","Field West","Account Executive","Nicholas Tomshack",4],[2,"Mark Baum","Field East","Account Executive","Michelle McGinnis",4],[2,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[2,"Matt Wick","Inside","Account Executive","Ben Renner",2],[2,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",4],[2,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[2,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[2,"Michael Schroeder","Majors","Account Executive","Damien Mollere",4],[2,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",6],[2,"Michelle Brinton","Field West","Account Executive","Kelly Chapman",1],[2,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[2,"Nicholas Thomas","Field East","Account Executive","Rebecca Jenkins",4],[2,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[2,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",1],[2,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",4],[2,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",6],[2,"Richard Pacheco","Inside","Business Development","Tim Philbin",1],[2,"Rob Poole","Majors","Account Executive","Chris Reno",4],[2,"Rob Sassa","Majors","Account Executive","Preyas Patel",4],[2,"Rob Storey","Field East","Account Executive","Kevin Lerner",4],[2,"Robert Renner","Inside","Account Executive","Matt Wick",2],[2,"Ryan Scarborough","Field East","Account Executive","Rebecca Jenkins",2],[2,"Samantha Siemiawski","Field East","Account Executive","Kevin Lerner",4],[2,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[2,"Shane King","Field West","Account Executive","Harry Kammholz",4],[2,"Shannon Boone","Inside","Business Development","Ben Renner",2],[2,"Shelby Hill","Field East","Account Executive","Ian McDonald",5],[2,"Shelly Keith","Field West","Account Executive","Kelly Chapman",4],[2,"Sonia Lara","Field West","Account Executive","Harry Kammholz",4],[2,"Steve Williams","Inside","Business Development","Ben Renner",4],[2,"Teddy Blumberg","Majors","Account Executive","Evan Ross",4],[2,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",4],[2,"Tyler Morrissey","Field East","Account Executive","Michelle McGinnis",4],[2,"Valerie Citro-Geraci","Field West","Account Executive","Ramsey Weber",4],[2,"Waverly Jordan","Inside","Business Development","Tim Philbin",3],[3,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",4],[3,"Alexis Stimac","Field West","Account Executive","Ramsey Weber",4],[3,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",4],[3,"Angela Kleinman","Inside","Account Executive","Angela Kleinman",2],[3,"Anthony Gizzi","Field East","Account Executive","Trish Baldwin",1],[3,"Arthur Carina","Majors","Account Executive","Preyas Patel",1],[3,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[3,"Austin Vander Zanden","Majors","Account Executive","Preyas Patel",4],[3,"Becky Fajardo","Field East","Account Executive","Kevin Lerner",4],[3,"Ben Renner","Inside","Account Executive","Ben Renner",3],[3,"Brendan Miller","Inside","Account Executive","Matt Wick",1],[3,"Brian Wirth","Field West","Account Executive","Ramsey Weber",1],[3,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",4],[3,"Brooke Whisenhunt","Inside","Account Executive","Tim Philbin",3],[3,"Bryan Deker","Majors","Account Executive","Preyas Patel",4],[3,"Caitlin Correa","Majors","Account Executive","Damien Mollere",4],[3,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",6],[3,"Cassie Berry","Majors","Account Executive","Peter Mosca",1],[3,"Christopher Dinh","Field East","Account Executive","Ian McDonald",4],[3,"Courtney Phillips","Majors","Account Executive","Damien Mollere",5],[3,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",6],[3,"Deanna Sikora","Majors","Account Executive","Damien Mollere",4],[3,"Derek Tardanico","Field East","Account Executive","Ian McDonald",4],[3,"Eileen Patterson","Field East","Account Executive","Trish Baldwin",1],[3,"Emily Bassett","Field West","Account Executive","Harry Kammholz",1],[3,"Emma Dudak","Inside","Account Executive","Tim Philbin",2],[3,"Gabriella Price","Field East","Account Executive","Kevin Lerner",4],[3,"Gene Werley","Inside","Account Executive","Matt Wick",4],[3,"Gerard Bednash","Field East","Account Executive","Trish Baldwin",4],[3,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",3],[3,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[3,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",4],[3,"Jack Bianciotto","Field West","Account Executive","Ramsey Weber",4],[3,"Jason Pittack","Majors","Account Executive","Evan Ross",5],[3,"Jeff Topor","Field West","Account Executive","Nicholas Tomshack",1],[3,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[3,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",4],[3,"Jenny Aburto","Field West","Account Executive","Harry Kammholz",1],[3,"Jerry Hansen","Field East","Account Executive","Ian McDonald",4],[3,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",4],[3,"Jordan Gedik","Majors","Account Executive","Evan Ross",4],[3,"Jory Leaver","Inside","Business Development","Ben Renner",4],[3,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",5],[3,"Joseph Loan","Field East","Account Executive","Ian McDonald",5],[3,"Joseph McGrath","Field East","Account Executive","Michelle McGinnis",4],[3,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",4],[3,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",6],[3,"Kait Hoff-Sojda","Inside","Account Executive","Kait Hoff-Sojda",2],[3,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",1],[3,"Kegan Portillo","Inside","Account Executive","Matt Wick",4],[3,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[3,"Kimberly Norman","Inside","Account Executive","Ben Renner",2],[3,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",1],[3,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",7],[3,"Lauren Hughes","Inside","Account Executive","Angela Kleinman",1],[3,"Lauren Szara","Inside","Account Executive","Matt Wick",4],[3,"Lori Watson","Majors","Account Executive","Damien Mollere",4],[3,"Luciana Raspanti","Majors","Account Executive","Evan Ross",1],[3,"Maria Graves","Field East","Account Executive","Kevin Lerner",4],[3,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[3,"Matt Wick","Inside","Account Executive","Ben Renner",2],[3,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[3,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[3,"Michael Schroeder","Majors","Account Executive","Damien Mollere",4],[3,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",6],[3,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[3,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[3,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",4],[3,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",6],[3,"Richard Pacheco","Inside","Business Development","Angela Kleinman",1],[3,"Rob Poole","Majors","Account Executive","Chris Reno",4],[3,"Rob Sassa","Majors","Account Executive","Preyas Patel",4],[3,"Rob Storey","Field East","Account Executive","Kevin Lerner",4],[3,"Robert Renner","Inside","Account Executive","Matt Wick",2],[3,"Samantha Biafore","Inside","Account Executive","Angela Kleinman",1],[3,"Samantha Siemiawski","Field East","Account Executive","Kevin Lerner",4],[3,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[3,"Shane King","Field West","Account Executive","Harry Kammholz",4],[3,"Shelby Hill","Field East","Account Executive","Ian McDonald",4],[3,"Shelly Keith","Field West","Account Executive","Kelly Chapman",1],[3,"Steve Williams","Inside","Business Development","Ben Renner",4],[3,"Steven Gerchen","Majors","Account Executive","Evan Ross",4],[3,"Teddy Blumberg","Majors","Account Executive","Evan Ross",4],[3,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",4],[3,"Tyler Morrissey","Field East","Account Executive","Michelle McGinnis",4],[3,"Valerie Citro-Geraci","Field West","Account Executive","Ramsey Weber",4],[3,"Waverly Jordan","Inside","Business Development","Tim Philbin",2],[3,"Zach Corbin","Field West","Account Executive","John Kitson",1],[4,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",5],[4,"Al Hern","Inside","Business Development","Tim Philbin",7],[4,"Alexis Stimac","Field West","Account Executive","Ramsey Weber",4],[4,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",6],[4,"Andy Allen","Majors","Account Executive","Peter Mosca",4],[4,"Annemarie Gusmano","Field East","Account Executive","Kevin Lerner",4],[4,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[4,"Austin Vander Zanden","Majors","Account Executive","Preyas Patel",4],[4,"Becky Fajardo","Field East","Account Executive","Kevin Lerner",6],[4,"Ben Miller","Field West","Account Executive","Kelly Chapman",6],[4,"Bradon Greth","Field East","Account Executive","Rebecca Jenkins",6],[4,"Brendan Miller","Inside","Account Executive","Matt Wick",6],[4,"Brian Wirth","Field West","Account Executive","Ramsey Weber",4],[4,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",4],[4,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[4,"Bryan Deker","Majors","Account Executive","Preyas Patel",4],[4,"Bryan Mand","Field East","Account Executive","Trish Baldwin",6],[4,"Carly Ewen","Field West","Account Executive","Ramsey Weber",4],[4,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",4],[4,"Cayce Lindsey","AccuTrade","AccuTrade","Grant Goering",2],[4,"Christopher Dinh","Field East","Account Executive","Ian McDonald",4],[4,"Clare Ulmer","Field East","Account Executive","Kevin Lerner",6],[4,"Courtney Phillips","Majors","Account Executive","Damien Mollere",6],[4,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",6],[4,"Curt Grigas","Field West","Account Executive","Ramsey Weber",4],[4,"Dan Monk","Client Partner","Client Partner","Jay Boehm",2],[4,"Dane Cronbaugh","Client Partner","Client Partner","John David Scozzaro",2],[4,"David Kogan","Inside","Business Development","Tim Philbin",6],[4,"David Needham","Client Partner","Client Partner","Jay Boehm",2],[4,"David Taylor","Inside","Business Development","Tim Philbin",6],[4,"Derek Smith","Inside","Business Development","Ben Renner",6],[4,"Derek Tardanico","Field East","Account Executive","Ian McDonald",4],[4,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",6],[4,"Donald Burbach","Field East","Account Executive","Trish Baldwin",6],[4,"Eamon Eager","Majors","Account Executive","Damien Mollere",2],[4,"Emma Dudak","Inside","Account Executive","Matt Wick",6],[4,"Gabriella Price","Field East","Account Executive","Kevin Lerner",6],[4,"Gene Werley","Inside","Account Executive","Matt Wick",5],[4,"Gerard Bednash","Field East","Account Executive","Trish Baldwin",6],[4,"Gillian Zucker","Majors","Account Executive","Chris Reno",6],[4,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[4,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[4,"Jarrod Cromwell","Field West","Account Executive","Ramsey Weber",4],[4,"Jason Pittack","Majors","Account Executive","Evan Ross",6],[4,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",6],[4,"Jeffrey Loots","Majors","Account Executive","Preyas Patel",4],[4,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",6],[4,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",4],[4,"Jenny Aburto","Field West","Account Executive","Harry Kammholz",6],[4,"Jerry Hansen","Field East","Account Executive","Ian McDonald",4],[4,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",4],[4,"Jordan Gedik","Majors","Account Executive","Evan Ross",4],[4,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",6],[4,"Joseph Loan","Field East","Account Executive","Ian McDonald",5],[4,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",6],[4,"Julia Snyder","Majors","Account Executive","Damien Mollere",2],[4,"Justin Tuttle","Client Partner","Client Partner","John David Scozzaro",2],[4,"Kamani Smith","Inside","Account Executive","Angela Kleinman",6],[4,"Karen (Dean) Bowling","Field West","Account Executive","Ramsey Weber",4],[4,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",6],[4,"Karyn Coyle","Majors","Account Executive","Damien Mollere",1],[4,"Kegan Portillo","Inside","Account Executive","Matt Wick",6],[4,"Kendal Williams","Inside","Account Executive","Angela Kleinman",6],[4,"Kent Settlemyer","AccuTrade","AccuTrade","Grant Goering",2],[4,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[4,"Kevin Delph","Field East","Account Executive","Kevin Lerner",6],[4,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",6],[4,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",7],[4,"Lauren Hughes","Field West","Account Executive","Harry Kammholz",6],[4,"Lauren Szara","Inside","Account Executive","Matt Wick",6],[4,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[4,"Lois Windsor","Field East","Account Executive","Trish Baldwin",6],[4,"Lori Watson","Majors","Account Executive","Damien Mollere",4],[4,"Maria Graves","Field East","Account Executive","Kevin Lerner",4],[4,"Mark Baum","Field East","Account Executive","Michelle McGinnis",4],[4,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[4,"Matt Cumbow","Client Partner","Client Partner","John David Scozzaro",2],[4,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[4,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",6],[4,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",6],[4,"Michael Balzano","Majors","Account Executive","Chris Reno",6],[4,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[4,"Michael Kruse","AccuTrade","AccuTrade","Grant Goering",2],[4,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[4,"Michael Schroeder","Majors","Account Executive","Damien Mollere",4],[4,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",6],[4,"Michelle Heath","Field West","Account Executive","Ramsey Weber",5],[4,"Michelle McKenna","Client Partner","Client Partner","John David Scozzaro",2],[4,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",6],[4,"Mike Egan","Client Partner","Client Partner","Jay Boehm",2],[4,"Mohammad Alam","Client Partner","Client Partner","Jay Boehm",2],[4,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[4,"Niall Fenton","Majors","Account Executive","Evan Ross",2],[4,"Nicholas Thomas","Field East","Account Executive","Rebecca Jenkins",4],[4,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[4,"Nicole Berry","Field West","Account Executive","John Kitson",5],[4,"Nicole Sojda","Inside","Account Executive","Angela Kleinman",6],[4,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",4],[4,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",4],[4,"Paul Craig","Inside","Account Executive","Kim Gilliam",6],[4,"Paul Zetlmeisl","Field East","Account Executive","Trish Baldwin",6],[4,"Rob Poole","Majors","Account Executive","Chris Reno",4],[4,"Rob Sassa","Majors","Account Executive","Preyas Patel",5],[4,"Rob Storey","Field East","Account Executive","Kevin Lerner",4],[4,"Robert Kwasneski","Client Partner","Client Partner","Andrew Pelc",2],[4,"Ryan Altier","Client Partner","Client Partner","Ryan Kwasneski",2],[4,"Ryan Scarborough","Field East","Account Executive","Rebecca Jenkins",5],[4,"Sara Sanchez","Majors","Account Executive","Peter Mosca",4],[4,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[4,"Sean Eager","Field East","Account Executive","Trish Baldwin",6],[4,"Shane King","Field West","Account Executive","Harry Kammholz",4],[4,"Shannon Boone","Inside","Business Development","Ben Renner",6],[4,"Sharon Cunane","Majors","Account Executive","Patti White",2],[4,"Shelby Hill","Field East","Account Executive","Ian McDonald",4],[4,"Shellane McMillen","Field West","Account Executive","Kelly Chapman",6],[4,"Shelley Rutherford","Client Partner","Client Partner","Andrew Pelc",2],[4,"Shelly Keith","Field West","Account Executive","Kelly Chapman",6],[4,"Sonia Lara","Field West","Account Executive","Harry Kammholz",6],[4,"Stephanie Watson","Client Partner","Client Partner","Jay Boehm",2],[4,"Steve Williams","Inside","Business Development","Ben Renner",4],[4,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[4,"Steven Gerchen","Majors","Account Executive","Evan Ross",4],[4,"Steven Retz","Field West","Account Executive","Ramsey Weber",4],[4,"Teddy Blumberg","Majors","Account Executive","Evan Ross",4],[4,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",6],[4,"Tyler Morrissey","Field East","Account Executive","Michelle McGinnis",4],[4,"Victoria Rolland","Inside","Account Executive","Matt Wick",6],[4,"Wade Gunning","AccuTrade","AccuTrade","Katie Van",2],[5,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",5],[5,"Alexis Stimac","Field West","Account Executive","Ramsey Weber",4],[5,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",4],[5,"Andrew Pelc","Client Partner","Client Partner","Matt Bute",2],[5,"Andy Allen","Majors","Account Executive","Peter Mosca",5],[5,"April Schenk","Client Partner","Client Partner","John David Scozzaro",2],[5,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[5,"Austin Vander Zanden","Majors","Account Executive","Preyas Patel",4],[5,"Brendan Miller","Inside","Account Executive","Matt Wick",6],[5,"Brian Wirth","Field West","Account Executive","Ramsey Weber",4],[5,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",5],[5,"Bryan Deker","Majors","Account Executive","Preyas Patel",4],[5,"Bryan Mand","Field East","Account Executive","Trish Baldwin",6],[5,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",4],[5,"Christopher Dinh","Field East","Account Executive","Ian McDonald",4],[5,"Courtney Corning","Field West","Account Executive","John Kitson",4],[5,"Courtney Phillips","Majors","Account Executive","Damien Mollere",6],[5,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",6],[5,"Dan Monk","Client Partner","Client Partner","Jay Boehm",2],[5,"Dane Cronbaugh","Client Partner","Client Partner","John David Scozzaro",2],[5,"David Kogan","Inside","Business Development","Tim Philbin",6],[5,"David Needham","Client Partner","Client Partner","Jay Boehm",2],[5,"David Taylor","Inside","Business Development","Tim Philbin",6],[5,"Deanna Sikora","Majors","Account Executive","Damien Mollere",1],[5,"Derek Smith","Inside","Business Development","Ben Renner",6],[5,"Derek Tardanico","Field East","Account Executive","Ian McDonald",4],[5,"Donald Burbach","Field East","Account Executive","Trish Baldwin",6],[5,"Eileen Patterson","Field East","Account Executive","Trish Baldwin",5],[5,"Emma Dudak","Inside","Account Executive","Matt Wick",4],[5,"Gabriella Price","Field East","Account Executive","Kevin Lerner",4],[5,"Gene Werley","Inside","Account Executive","Matt Wick",4],[5,"Gerard Bednash","Field East","Account Executive","Trish Baldwin",4],[5,"Gillian Zucker","Majors","Account Executive","Chris Reno",2],[5,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[5,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[5,"Jason Pittack","Majors","Account Executive","Evan Ross",4],[5,"Jay Boehm","Client Partner","Client Partner","Matt Bute",2],[5,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[5,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",6],[5,"Jerry Hansen","Field East","Account Executive","Ian McDonald",4],[5,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",4],[5,"John David Scozzaro","Client Partner","Client Partner","",2],[5,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",4],[5,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",6],[5,"Joseph Loan","Field East","Account Executive","Ian McDonald",4],[5,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",6],[5,"Justin Tuttle","Client Partner","Client Partner","John David Scozzaro",2],[5,"Karyn Coyle","Majors","Account Executive","Damien Mollere",1],[5,"Kegan Portillo","Inside","Account Executive","Matt Wick",6],[5,"Kent Settlemyer","AccuTrade","AccuTrade","Grant Goering",2],[5,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[5,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",5],[5,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",6],[5,"Lauren Szara","Inside","Account Executive","Matt Wick",6],[5,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[5,"Lois Windsor","Field East","Account Executive","Trish Baldwin",5],[5,"Maria Graves","Field East","Account Executive","Kevin Lerner",7],[5,"Martin Maiorano","Majors","Account Executive","Damien Mollere",1],[5,"Matt Cumbow","Client Partner","Client Partner","John David Scozzaro",2],[5,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[5,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",6],[5,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",4],[5,"Michael Balzano","Majors","Account Executive","Chris Reno",6],[5,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[5,"Michael Kruse","AccuTrade","AccuTrade","Grant Goering",2],[5,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[5,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",4],[5,"Michelle McKenna","Client Partner","Client Partner","John David Scozzaro",2],[5,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",6],[5,"Mike Egan","Client Partner","Client Partner","Jay Boehm",2],[5,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[5,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[5,"Nick Alfera","Field East","Account Executive","Ian McDonald",4],[5,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",6],[5,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",4],[5,"Paul Craig","Inside","Account Executive","Kim Gilliam",6],[5,"Paul Zetlmeisl","Field East","Account Executive","Trish Baldwin",6],[5,"Richard Pacheco","Inside","Business Development","Tim Philbin",6],[5,"Robert Kwasneski","Client Partner","Client Partner","Andrew Pelc",2],[5,"Ryan Altier","Client Partner","Client Partner","Ryan Kwasneski",2],[5,"Ryan Kwasneski","Client Partner","Client Partner","Patti White",2],[5,"Ryan Scarborough","Field East","Account Executive","Rebecca Jenkins",5],[5,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[5,"Sean Eager","Field East","Account Executive","Trish Baldwin",6],[5,"Shane King","Field West","Account Executive","Harry Kammholz",4],[5,"Sharla Koob","Field East","Account Executive","Michelle McGinnis",5],[5,"Sharon Cunane","Majors","Account Executive","Patti White",2],[5,"Shelby Hill","Field East","Account Executive","Ian McDonald",4],[5,"Shelley Rutherford","Client Partner","Client Partner","Andrew Pelc",2],[5,"Steve Williams","Inside","Business Development","Ben Renner",4],[5,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[5,"Steven Gerchen","Majors","Account Executive","Evan Ross",5],[5,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",4],[5,"Tyler Morrissey","Field East","Account Executive","Michelle McGinnis",4],[5,"Wade Gunning","AccuTrade","AccuTrade","Katie Van",2],[6,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",5],[6,"Al Hern","Inside","Business Development","Tim Philbin",5],[6,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",4],[6,"Andie Berthiaume","Field West","Account Executive","Kelly Chapman",5],[6,"Andrew Pelc","Field East","Client Partner","Matt Bute",2],[6,"Andy Allen","Majors","Account Executive","Peter Mosca",5],[6,"April Schenk","Field East","Client Partner","John David Scozzaro",2],[6,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[6,"Austin Vander Zanden","Majors","Account Executive","Preyas Patel",4],[6,"Bekah Szczygiel","Majors","Account Executive","Preyas Patel",1],[6,"Brendan Miller","Inside","Account Executive","Matt Wick",6],[6,"Brian Wirth","Field West","Account Executive","Ramsey Weber",4],[6,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",4],[6,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",5],[6,"Bryan Deker","Majors","Account Executive","Preyas Patel",4],[6,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",4],[6,"Cassie Berry","Majors","Account Executive","Peter Mosca",4],[6,"Christopher Dinh","Field East","Account Executive","Ian McDonald",4],[6,"Courtney Corning","Field West","Account Executive","John Kitson",4],[6,"Courtney Phillips","Majors","Account Executive","Damien Mollere",5],[6,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",7],[6,"Dan Monk","Inside","Client Partner","Jay Boehm",2],[6,"Dane Cronbaugh","Field East","Client Partner","John David Scozzaro",2],[6,"David Kogan","Inside","Business Development","Tim Philbin",6],[6,"David Needham","Inside","Client Partner","Jay Boehm",2],[6,"David Taylor","Inside","Business Development","Tim Philbin",6],[6,"Deanna Sikora","Majors","Account Executive","Damien Mollere",5],[6,"Derek Tardanico","Field East","Account Executive","Ian McDonald",4],[6,"Gabriella Price","Field East","Account Executive","Kevin Lerner",4],[6,"Gene Werley","Inside","Account Executive","Matt Wick",4],[6,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[6,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[6,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",4],[6,"James Roberts","Inside","Business Development","Tim Philbin",6],[6,"Jarrod Cromwell","Field West","Account Executive","Ramsey Weber",4],[6,"Jason Pittack","Majors","Account Executive","Evan Ross",5],[6,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[6,"Jeffrey Loots","Majors","Account Executive","Preyas Patel",4],[6,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",7],[6,"Jerry Hansen","Field East","Account Executive","Ian McDonald",4],[6,"John David Scozzaro","Field East","Client Partner","",2],[6,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",4],[6,"Jordan Gedik","Majors","Account Executive","Evan Ross",4],[6,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",7],[6,"Joseph Loan","Field East","Account Executive","Ian McDonald",4],[6,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",6],[6,"Justin Tuttle","Field East","Client Partner","John David Scozzaro",2],[6,"Kegan Portillo","Inside","Account Executive","Matt Wick",6],[6,"Kent Settlemyer","AccuTrade","AccuTrade","Grant Goering",2],[6,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[6,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",5],[6,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",6],[6,"Lauren Szara","Inside","Account Executive","Matt Wick",6],[6,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[6,"Lois Windsor","Field East","Account Executive","Trish Baldwin",5],[6,"Maria Graves","Field East","Account Executive","Kevin Lerner",5],[6,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[6,"Matt Cumbow","Field East","Client Partner","John David Scozzaro",2],[6,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[6,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",7],[6,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[6,"Michael Kruse","AccuTrade","AccuTrade","Grant Goering",2],[6,"Michael Murphy","Field East","Account Executive","Ian McDonald",5],[6,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",4],[6,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",7],[6,"Mike Egan","Inside","Client Partner","Jay Boehm",2],[6,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[6,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[6,"Nick Alfera","Field East","Account Executive","Ian McDonald",4],[6,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",5],[6,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",4],[6,"Paul Craig","Inside","Account Executive","Kim Gilliam",6],[6,"Ryan Altier","Majors","Client Partner","Ryan Kwasneski",2],[6,"Ryan Kwasneski","Majors","Client Partner","Patti White",2],[6,"Ryan Scarborough","Field East","Account Executive","Rebecca Jenkins",5],[6,"Sadie Svitenko","Field East","Account Executive","Michelle McGinnis",1],[6,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[6,"Sean Eager","Field East","Account Executive","Trish Baldwin",6],[6,"Shane King","Field West","Account Executive","Harry Kammholz",4],[6,"Shannon Boone","Inside","Business Development","Ben Renner",5],[6,"Sharon Cunane","Majors","Account Executive","Patti White",2],[6,"Shelby Hill","Field East","Account Executive","Ian McDonald",4],[6,"Shellane McMillen","Field West","Account Executive","Kelly Chapman",5],[6,"Shelley Rutherford","Field East","Client Partner","Andrew Pelc",2],[6,"Steve Williams","Inside","Business Development","Ben Renner",4],[6,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[6,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",4],[6,"Tyler Morrissey","Field East","Account Executive","Michelle McGinnis",4],[6,"Wade Gunning","AccuTrade","AccuTrade","Katie Van",2],[7,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",5],[7,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",4],[7,"Allan Leitch","Field West","Account Executive","Nicholas Tomshack",5],[7,"Andie Berthiaume","Field West","Account Executive","Kelly Chapman",4],[7,"Andrew Pelc","Field West","Client Partner","Kelly Chapman",2],[7,"Anna Loerke","Inside","Client Partner","Ben Renner",2],[7,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[7,"Bekah Szczygiel","Majors","Account Executive","Preyas Patel",1],[7,"Ben Renner","Inside","Client Partner","Ben Renner",2],[7,"Brendan Miller","Inside","Account Executive","Matt Wick",2],[7,"Brian Wirth","Field West","Account Executive","Ramsey Weber",4],[7,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",4],[7,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",1],[7,"Bryan Deker","Majors","Account Executive","Preyas Patel",5],[7,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",4],[7,"Cassie Berry","Majors","Account Executive","Peter Mosca",4],[7,"Christopher Dinh","Field East","Account Executive","Ian McDonald",4],[7,"Clare Ulmer","Field East","Account Executive","Kevin Lerner",4],[7,"Courtney Corning","Field West","Account Executive","John Kitson",4],[7,"Courtney Phillips","Majors","Account Executive","Damien Mollere",1],[7,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",6],[7,"Dan Monk","Inside","Client Partner","Jay Boehm",2],[7,"Dane Cronbaugh","Field East","Client Partner","John David Scozzaro",2],[7,"David Needham","Inside","Client Partner","Jay Boehm",2],[7,"David Taylor","Inside","Business Development","Tim Philbin",2],[7,"Deanna Sikora","Majors","Account Executive","Damien Mollere",5],[7,"Demi Westfall","Field West","Account Executive","Kelly Chapman",4],[7,"Derek Tardanico","Field East","Account Executive","Ian McDonald",4],[7,"Gabriel Gomez","Majors","Account Executive","Preyas Patel",1],[7,"Gabriella Price","Field East","Account Executive","Kevin Lerner",4],[7,"Gene Werley","Inside","Account Executive","Matt Wick",4],[7,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[7,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[7,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",4],[7,"Jacob Galonska","Majors","Account Executive","Evan Ross",4],[7,"James Roberts","Inside","Business Development","Tim Philbin",2],[7,"Jarrod Cromwell","Field West","Account Executive","Ramsey Weber",4],[7,"Jason Pittack","Majors","Account Executive","Evan Ross",4],[7,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",5],[7,"Jeffrey Loots","Majors","Account Executive","Preyas Patel",4],[7,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",7],[7,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",1],[7,"Jerry Hansen","Field East","Account Executive","Ian McDonald",4],[7,"John David Scozzaro","Field East","Client Partner","Kevin Lerner",2],[7,"John Russell","Inside","Business Development","Tim Philbin",1],[7,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",4],[7,"Jordan Gedik","Majors","Account Executive","Evan Ross",4],[7,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",6],[7,"Joseph Loan","Field East","Account Executive","Ian McDonald",4],[7,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",7],[7,"Justin Tuttle","Field East","Client Partner","John David Scozzaro",2],[7,"Kegan Portillo","Inside","Account Executive","Matt Wick",2],[7,"Kent Settlemyer","AccuTrade","AccuTrade","Grant Goering",2],[7,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",4],[7,"Kimberly Norman","Inside","Client Partner","Kimberly Norman",2],[7,"Kip Gotfredson","Field West","Client Partner","John Kitson",2],[7,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",1],[7,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",6],[7,"Lauren Szara","Inside","Account Executive","Matt Wick",6],[7,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[7,"Marissa Cannato","Field West","Account Executive","Nicholas Tomshack",1],[7,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[7,"Matt Cumbow","Field East","Client Partner","John David Scozzaro",2],[7,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[7,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",3],[7,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[7,"Michael Kruse","AccuTrade","AccuTrade","Grant Goering",2],[7,"Michael Murphy","Field East","Account Executive","Ian McDonald",4],[7,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",4],[7,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",7],[7,"Mike Egan","Inside","Client Partner","Jay Boehm",2],[7,"Nick Alfera","Field East","Account Executive","Ian McDonald",4],[7,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",1],[7,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",4],[7,"Paul Craig","Inside","Account Executive","Kim Gilliam",6],[7,"Ryan Altier","Majors","Client Partner","Ryan Kwasneski",2],[7,"Ryan Kwasneski","Majors","Client Partner","Peter Mosca",2],[7,"Ryan Scarborough","Field East","Account Executive","Rebecca Jenkins",1],[7,"Sadie Svitenko","Field East","Account Executive","Michelle McGinnis",1],[7,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[7,"Sean Eager","Field East","Account Executive","Trish Baldwin",7],[7,"Shane King","Field West","Account Executive","Harry Kammholz",4],[7,"Sharon Cunane","Majors","Account Executive","Patti White",2],[7,"Shelby Hill","Field East","Account Executive","Ian McDonald",4],[7,"Shelley Rutherford","Field East","Client Partner","Andrew Pelc",2],[7,"Stephanie Watson","Inside","Client Partner","Jay Boehm",2],[7,"Steve Williams","Inside","Business Development","Ben Renner",4],[7,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[7,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",4],[7,"Trish Baldwin","Inside","Client Partner","Tim Philbin",2],[7,"Tyler Morrissey","Field East","Account Executive","Michelle McGinnis",4],[7,"Wade Gunning","AccuTrade","AccuTrade","Katie Van",2],[8,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",5],[8,"Al Hern","Inside","Business Development","Tim Philbin",5],[8,"Allan Leitch","Field West","Account Executive","Nicholas Tomshack",4],[8,"Andie Berthiaume","Field West","Account Executive","Kelly Chapman",6],[8,"Anthony Gizzi","Field East","Account Executive","Trish Baldwin",6],[8,"April Schenk","Field East","Client Partner","John David Scozzaro",2],[8,"Arthur Carina","Majors","Account Executive","Preyas Patel",2],[8,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",7],[8,"Bekah Szczygiel","Majors","Account Executive","Preyas Patel",1],[8,"Ben Grinold","Majors","Account Executive","Preyas Patel",2],[8,"Ben Miller","Field West","Account Executive","Kelly Chapman",4],[8,"Brandon Bartels","Inside","Account Executive","Kim Gilliam",5],[8,"Brandon Haywood","Inside","Business Development","Tim Philbin",6],[8,"Brendan Miller","Inside","Account Executive","Matt Wick",5],[8,"Brian Wirth","Field West","Account Executive","Ramsey Weber",5],[8,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",6],[8,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[8,"Bryan Deker","Majors","Account Executive","Preyas Patel",4],[8,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",6],[8,"Cassie Berry","Majors","Account Executive","Peter Mosca",7],[8,"Cayce Lindsey","AccuTrade","AccuTrade","Grant Goering",2],[8,"Chris Monforton","Field East","Client Partner","Andrew Pelc",2],[8,"Christina Wells","Field West","Account Executive","Nicholas Tomshack",5],[8,"Christopher Dinh","Field East","Account Executive","Ian McDonald",5],[8,"Clare Ulmer","Field East","Account Executive","Kevin Lerner",5],[8,"Courtney Corning","Field West","Account Executive","John Kitson",5],[8,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",7],[8,"Dan Monk","Inside","Client Partner","Jay Boehm",2],[8,"Dane Cronbaugh","Field East","Client Partner","John David Scozzaro",2],[8,"Danielle McJunkins","Majors","Account Executive","Peter Mosca",2],[8,"David Kogan","Inside","Business Development","Tim Philbin",6],[8,"David Needham","Inside","Client Partner","Jay Boehm",2],[8,"David Taylor","Inside","Business Development","Tim Philbin",6],[8,"Deanna Sikora","Majors","Account Executive","Damien Mollere",7],[8,"Demi Westfall","Field West","Account Executive","Kelly Chapman",6],[8,"Derek Smith","Inside","Business Development","Ben Renner",5],[8,"Derek Tardanico","Field East","Account Executive","Ian McDonald",5],[8,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",7],[8,"Donald Burbach","Field East","Account Executive","Trish Baldwin",7],[8,"Dylan Lawrence","Field East","Account Executive","Michelle McGinnis",1],[8,"Eileen Patterson","Field East","Account Executive","Trish Baldwin",5],[8,"Elaine Ireland","Majors","Account Executive","Preyas Patel",5],[8,"Emily Bassett","Field West","Account Executive","Harry Kammholz",5],[8,"Gabriel Gomez","Majors","Account Executive","Preyas Patel",3],[8,"Gabriella Price","Field East","Account Executive","Kevin Lerner",4],[8,"Gene Werley","Inside","Account Executive","Matt Wick",6],[8,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",7],[8,"Heidi Kukoly","Field East","Account Executive","Kevin Lerner",4],[8,"Jacob Galonska","Majors","Account Executive","Evan Ross",5],[8,"James Roberts","Inside","Business Development","Tim Philbin",6],[8,"Jarrod Cromwell","Field West","Account Executive","Ramsey Weber",4],[8,"Jason Pittack","Majors","Account Executive","Evan Ross",5],[8,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[8,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",7],[8,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",5],[8,"Jenny Aburto","Field West","Account Executive","Harry Kammholz",7],[8,"JJ Sciacca","Field East","Account Executive","Ian McDonald",4],[8,"John Russell","Inside","Business Development","Tim Philbin",7],[8,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",7],[8,"Jory Leaver","Inside","Business Development","Ben Renner",7],[8,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",7],[8,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",7],[8,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",7],[8,"Justin Tuttle","Field East","Client Partner","John David Scozzaro",2],[8,"Kamani Smith","Inside","Account Executive","Angela Kleinman",7],[8,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",7],[8,"Kegan Portillo","Inside","Account Executive","Matt Wick",7],[8,"Kendal Williams","Inside","Account Executive","Angela Kleinman",6],[8,"Kent Settlemyer","AccuTrade","AccuTrade","Grant Goering",2],[8,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",6],[8,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",7],[8,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",6],[8,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[8,"Lori Watson","Majors","Account Executive","Damien Mollere",5],[8,"Marissa Cannato","Field West","Account Executive","Nicholas Tomshack",7],[8,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[8,"Matt Cumbow","Field East","Client Partner","John David Scozzaro",2],[8,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[8,"Melissa Ott","Inside","Account Executive","Angela Kleinman",5],[8,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",7],[8,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",5],[8,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[8,"Michael Murphy","Field East","Account Executive","Ian McDonald",7],[8,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",7],[8,"Michelle Heath","Field West","Account Executive","Ramsey Weber",5],[8,"Michelle Howard","Majors","Account Executive","Evan Ross",1],[8,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",7],[8,"Mike Egan","Inside","Client Partner","Jay Boehm",2],[8,"Mohammad Alam","Inside","Client Partner","Jay Boehm",1],[8,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",4],[8,"Nicholas Thomas","Field East","Account Executive","Ian McDonald",5],[8,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[8,"Nicole Sojda","Inside","Account Executive","Angela Kleinman",6],[8,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",7],[8,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",5],[8,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",4],[8,"Paul Craig","Inside","Account Executive","Kim Gilliam",7],[8,"Paul Madeano","Field West","Account Executive","Nicholas Tomshack",5],[8,"Ryan Altier","Majors","Client Partner","Ryan Kwasneski",2],[8,"Ryan Scarborough","Majors","Account Executive","Damien Mollere",2],[8,"Sadie Svitenko","Field East","Account Executive","Michelle McGinnis",3],[8,"Samantha Biafore","Inside","Business Development","Tim Philbin",7],[8,"Sarah Hoffman","Field West","Account Executive","Nicholas Tomshack",4],[8,"Sean Eager","Field East","Account Executive","Trish Baldwin",5],[8,"Shane King","Field West","Account Executive","Harry Kammholz",7],[8,"Shannon Boone","Inside","Business Development","Ben Renner",6],[8,"Sharla Koob","Field East","Account Executive","Michelle McGinnis",5],[8,"Sharon Cunane","Majors","Account Executive","Patti White",2],[8,"Shelby Hill","Field East","Account Executive","Ian McDonald",5],[8,"Shelley Rutherford","Field East","Client Partner","Andrew Pelc",2],[8,"Shelly Keith","Field West","Account Executive","Kelly Chapman",6],[8,"Stephanie Watson","Inside","Client Partner","Jay Boehm",2],[8,"Steve Williams","Inside","Business Development","Ben Renner",5],[8,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[8,"Steven Gerchen","Majors","Account Executive","Evan Ross",5],[8,"Teddy Blumberg","Majors","Account Executive","Evan Ross",6],[8,"Zach Corbin","Field West","Account Executive","John Kitson",5],[9,"Abby Meredith","Field East","Account Executive","Michelle McGinnis",5],[9,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",5],[9,"Allan Leitch","Field West","Account Executive","Nicholas Tomshack",5],[9,"Andrew Pelc","Field East","Client Partner","Matt Bute",2],[9,"Annemarie Gusmano","Field East","Account Executive","Kevin Lerner",4],[9,"Anthony Gizzi","Field East","Account Executive","Trish Baldwin",6],[9,"April Schenk","Field East","Client Partner","John David Scozzaro",2],[9,"Arthur Carina","Majors","Account Executive","Preyas Patel",2],[9,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[9,"Bekah Szczygiel","Majors","Account Executive","Preyas Patel",5],[9,"Brandon Bartels","Inside","Account Executive","Kim Gilliam",5],[9,"Brendan Miller","Inside","Account Executive","Matt Wick",5],[9,"Brian Wirth","Field West","Account Executive","Ramsey Weber",5],[9,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",6],[9,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[9,"Caitlin Correa","Majors","Account Executive","Damien Mollere",5],[9,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",6],[9,"Cassie Berry","Majors","Account Executive","Peter Mosca",6],[9,"Cayce Lindsey","AccuTrade","AccuTrade","Grant Goering",2],[9,"Chris Monforton","Field East","Client Partner","Andrew Pelc",2],[9,"Christopher Dinh","Field East","Account Executive","Ian McDonald",5],[9,"Clare Ulmer","Field East","Account Executive","Kevin Lerner",4],[9,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",7],[9,"Dan Monk","Inside","Client Partner","Jay Boehm",2],[9,"Dane Cronbaugh","Field East","Client Partner","John David Scozzaro",2],[9,"Danielle McJunkins","Majors","Account Executive","Peter Mosca",2],[9,"David Kogan","Inside","Business Development","Tim Philbin",5],[9,"David Needham","Inside","Client Partner","Jay Boehm",2],[9,"Deanna Sikora","Majors","Account Executive","Damien Mollere",7],[9,"Demi Westfall","Field West","Account Executive","Kelly Chapman",7],[9,"Derek Smith","Inside","Business Development","Ben Renner",5],[9,"Derek Tardanico","Field East","Account Executive","Ian McDonald",5],[9,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",6],[9,"Donald Burbach","Field East","Account Executive","Trish Baldwin",7],[9,"Eileen Patterson","Field East","Account Executive","Trish Baldwin",5],[9,"Elaine Ireland","Majors","Account Executive","Preyas Patel",5],[9,"Eric Ideman","Field West","Account Executive","Kelly Chapman",5],[9,"Gabriel Gomez","Majors","Account Executive","Preyas Patel",3],[9,"Gabriella Price","Field East","Account Executive","Kevin Lerner",5],[9,"Gene Werley","Inside","Account Executive","Matt Wick",6],[9,"Gerard Bednash","Field East","Account Executive","Trish Baldwin",5],[9,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[9,"Jacob Galonska","Majors","Account Executive","Evan Ross",5],[9,"James Roberts","Inside","Business Development","Tim Philbin",6],[9,"Jarrod Cromwell","Field West","Account Executive","Ramsey Weber",5],[9,"Jay Boehm","Inside","Client Partner","Matt Bute",2],[9,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[9,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",6],[9,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",5],[9,"Jerry Hansen","Field East","Account Executive","Ian McDonald",5],[9,"John Russell","Inside","Business Development","Tim Philbin",7],[9,"Jordan Bracero","Inside","Account Executive","Kait Hoff-Sojda",5],[9,"Jory Leaver","Inside","Business Development","Ben Renner",6],[9,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",6],[9,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",7],[9,"Justin Maddux","Majors","Account Executive","Chris Reno",1],[9,"Justin Tuttle","Field East","Client Partner","John David Scozzaro",2],[9,"Kamani Smith","Inside","Account Executive","Angela Kleinman",6],[9,"Kegan Portillo","Inside","Account Executive","Matt Wick",7],[9,"Kendal Williams","Inside","Account Executive","Angela Kleinman",6],[9,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",6],[9,"Kevin Delph","Field East","Account Executive","Kevin Lerner",5],[9,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",7],[9,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",6],[9,"Lauren Szara","Inside","Account Executive","Matt Wick",5],[9,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[9,"Lori Watson","Majors","Account Executive","Damien Mollere",5],[9,"Marissa Cannato","Field West","Account Executive","Nicholas Tomshack",6],[9,"Martin Maiorano","Majors","Account Executive","Damien Mollere",5],[9,"Matt Cumbow","Field East","Client Partner","John David Scozzaro",2],[9,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[9,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",7],[9,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",5],[9,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[9,"Michael Murphy","Field East","Account Executive","Ian McDonald",7],[9,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",6],[9,"Michelle Howard","Majors","Account Executive","Evan Ross",1],[9,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",7],[9,"Mike Egan","Inside","Client Partner","Jay Boehm",2],[9,"Mohammad Alam","Inside","Client Partner","Jay Boehm",1],[9,"Mohyeldin Ahmed","Field East","Account Executive","Ian McDonald",5],[9,"Nicholas Villani","Field East","Account Executive","Ian McDonald",5],[9,"Nicole Sojda","Inside","Account Executive","Angela Kleinman",6],[9,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",7],[9,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",5],[9,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",4],[9,"Paul Craig","Inside","Account Executive","Kim Gilliam",7],[9,"Paul Madeano","Field West","Account Executive","Nicholas Tomshack",5],[9,"Richard Pacheco","Inside","Business Development","Tim Philbin",5],[9,"Rob Sassa","Majors","Account Executive","Preyas Patel",4],[9,"Ryan Altier","Field East","Client Partner","Ryan Kwasneski",2],[9,"Ryan Kwasneski","Field East","Client Partner","Patti White",2],[9,"Ryan Scarborough","Majors","Account Executive","Damien Mollere",2],[9,"Sadie Svitenko","Field East","Account Executive","Michelle McGinnis",1],[9,"Samantha Biafore","Inside","Business Development","Tim Philbin",7],[9,"Sean Eager","Field East","Account Executive","Trish Baldwin",5],[9,"Shane King","Field West","Account Executive","Harry Kammholz",5],[9,"Shannon Boone","Inside","Business Development","Ben Renner",7],[9,"Sharon Cunane","Majors","Account Executive","Patti White",3],[9,"Shelby Hill","Field East","Account Executive","Ian McDonald",5],[9,"Shellane McMillen","Field West","Account Executive","Kelly Chapman",4],[9,"Shelley Rutherford","Field East","Client Partner","Andrew Pelc",2],[9,"Shelly Keith","Field West","Account Executive","Kelly Chapman",6],[9,"Stephanie Watson","Inside","Client Partner","Jay Boehm",2],[9,"Steve Williams","Inside","Business Development","Ben Renner",5],[9,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[9,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",6],[9,"Zach Corbin","Field West","Account Executive","John Kitson",5],[10,"Alivia Brigman","Field East","Account Executive","Kevin Lerner",1],[10,"Allan Leitch","Field West","Account Executive","Nicholas Tomshack",5],[10,"Andrew Pelc","Field East","Client Partner","Matt Bute",2],[10,"Anna Loerke","Inside","Account Executive","Angela Kleinman",6],[10,"Annemarie Gusmano","Field East","Account Executive","Kevin Lerner",4],[10,"April Schenk","Field East","Client Partner","John David Scozzaro",2],[10,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[10,"Bekah Szczygiel","Majors","Account Executive","Preyas Patel",1],[10,"Ben Miller","Field West","Account Executive","Kelly Chapman",4],[10,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",6],[10,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[10,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",6],[10,"Cassie Berry","Majors","Account Executive","Peter Mosca",2],[10,"Cayce Lindsey","AccuTrade","Business Development","Grant Goering",2],[10,"Chris Monforton","Field East","Client Partner","Andrew Pelc",2],[10,"Clare Ulmer","Field East","Account Executive","Kevin Lerner",4],[10,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",7],[10,"Dan Monk","Field East","Client Partner","Jay Boehm",2],[10,"Dane Cronbaugh","Field East","Client Partner","John David Scozzaro",2],[10,"David Kogan","Inside","Business Development","Tim Philbin",1],[10,"David Needham","Field East","Client Partner","Jay Boehm",2],[10,"Demi Westfall","Field West","Account Executive","Kelly Chapman",3],[10,"Derek Smith","Inside","Business Development","Ben Renner",1],[10,"Derek Tardanico","Field East","Account Executive","Ian McDonald",1],[10,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",2],[10,"Donald Burbach","Field East","Account Executive","Trish Baldwin",3],[10,"Eileen Patterson","Field East","Account Executive","Trish Baldwin",1],[10,"Eric Ideman","Field West","Account Executive","Kelly Chapman",1],[10,"Gabriella Price","Field East","Account Executive","Kevin Lerner",1],[10,"Gene Werley","Inside","Account Executive","Matt Wick",4],[10,"Gerard Bednash","Field East","Account Executive","Trish Baldwin",1],[10,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",2],[10,"Jacob Galonska","Majors","Account Executive","Evan Ross",4],[10,"James Roberts","Inside","Business Development","Tim Philbin",2],[10,"Jay Boehm","Field East","Client Partner","Matt Bute",2],[10,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",4],[10,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",7],[10,"Jennifer Carbonell","Field East","Account Executive","Trish Baldwin",5],[10,"John David Scozzaro","Field East","Client Partner","",2],[10,"John Russell","Inside","Business Development","Tim Philbin",3],[10,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",6],[10,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",7],[10,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",1],[10,"Justin Tuttle","Field East","Client Partner","John David Scozzaro",2],[10,"Kamani Smith","Inside","Account Executive","Angela Kleinman",2],[10,"Karen (Dean) Bowling","Field West","Account Executive","Ramsey Weber",2],[10,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",1],[10,"Kegan Portillo","Inside","Account Executive","Matt Wick",4],[10,"Kendal Williams","Inside","Account Executive","Angela Kleinman",4],[10,"Kenya Alvarez","Field East","Account Executive","Michelle McGinnis",6],[10,"Kevin Delph","Field East","Account Executive","Kevin Lerner",1],[10,"Kyle Bubak","Field West","Account Executive","Harry Kammholz",3],[10,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",7],[10,"Lauren Szara","Inside","Account Executive","Matt Wick",1],[10,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[10,"Lori Watson","Majors","Account Executive","Damien Mollere",1],[10,"Marissa Cannato","Field West","Account Executive","Nicholas Tomshack",3],[10,"Matt Cumbow","Field East","Client Partner","John David Scozzaro",2],[10,"Melinda Hawkes","Field East","Account Executive","Michelle McGinnis",5],[10,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",3],[10,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",1],[10,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[10,"Michael Murphy","Field East","Account Executive","Ian McDonald",1],[10,"Michelle Howard","Majors","Account Executive","Evan Ross",1],[10,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",7],[10,"Mike Egan","Field East","Client Partner","Jay Boehm",2],[10,"Mohammad Alam","Field East","Client Partner","Jay Boehm",1],[10,"Nicole Sojda","Inside","Account Executive","Angela Kleinman",2],[10,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",3],[10,"Patrick Scarborough","Field East","Account Executive","Trish Baldwin",1],[10,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",5],[10,"Paul Craig","Inside","Account Executive","Kim Gilliam",4],[10,"Paul Madeano","Field West","Account Executive","Nicholas Tomshack",5],[10,"Richard Pacheco","Inside","Business Development","Tim Philbin",1],[10,"Ryan Altier","Field East","Client Partner","Ryan Kwasneski",2],[10,"Ryan Kwasneski","Field East","Client Partner","Patti White",2],[10,"Sadie Svitenko","Field East","Account Executive","Michelle McGinnis",1],[10,"Samantha Biafore","Inside","Business Development","Tim Philbin",3],[10,"Sean Eager","Field East","Account Executive","Trish Baldwin",5],[10,"Shalise Curry","Inside","Business Development","Ben Renner",1],[10,"Shane King","Field West","Account Executive","Harry Kammholz",5],[10,"Shannon Boone","Inside","Business Development","Ben Renner",3],[10,"Sharon Cunane","Majors","Account Executive","Patti White",3],[10,"Shelby Hill","Field East","Account Executive","Ian McDonald",1],[10,"Shelley Rutherford","Field East","Client Partner","Andrew Pelc",2],[10,"Shelly Keith","Field West","Account Executive","Kelly Chapman",2],[10,"Steve Williams","Inside","Business Development","Ben Renner",5],[10,"Steven Bauer","AccuTrade","Business Development","Katie Van",2],[10,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",2],[10,"Zach Corbin","Field West","Account Executive","John Kitson",1],[11,"Al Hern","Inside","Business Development","Tim Philbin",1],[11,"Alivia Brigman","Field East","Account Executive","Rebecca Jenkins",1],[11,"Allan Leitch","Field West","Account Executive","John Kitson",7],[11,"Anna Loerke","Inside","Account Executive","Angela Kleinman",6],[11,"Annemarie Gusmano","Field East","Account Executive","Kevin Lerner",4],[11,"April Schenk","Field East","Client Partner","John David Scozzaro",2],[11,"Austin Ferritto","Inside","Account Executive","Angela Kleinman",6],[11,"Austin Vander Zanden","Majors","Account Executive","Preyas Patel",4],[11,"Becky Fajardo","Field East","Account Executive","Kevin Lerner",2],[11,"Bradon Greth","Field East","Account Executive","Ian McDonald",2],[11,"Brandon Haywood","Inside","Business Development","Tim Philbin",2],[11,"Brendan Miller","Inside","Account Executive","Matt Wick",6],[11,"Brittany Garnett","Inside","Account Executive","Kim Gilliam",4],[11,"Brooke Whisenhunt","Inside","Account Executive","Angela Kleinman",7],[11,"Bryan Deker","Majors","Account Executive","Preyas Patel",2],[11,"Carrie Zimmer","Inside","Account Executive","Kimberly Norman",7],[11,"Cassie Berry","Majors","Account Executive","Peter Mosca",2],[11,"Chris Monforton","Field East","Client Partner","Andrew Pelc",2],[11,"Christina Wells","Field East","Account Executive","Rebecca Jenkins",2],[11,"Courtney Corning","Field West","Account Executive","Ramsey Weber",1],[11,"Cristal Cherubini","Inside","Account Executive","Kimberly Norman",6],[11,"Curt Grigas","Field West","Account Executive","Ramsey Weber",2],[11,"Dan Monk","Field East","Client Partner","Jay Boehm",2],[11,"Dane Cronbaugh","Field East","Client Partner","John David Scozzaro",2],[11,"Darren Whitelock","Field East","Account Executive","John David Scozzaro",3],[11,"David Needham","Field East","Client Partner","Jay Boehm",2],[11,"David Taylor","Inside","Business Development","Tim Philbin",6],[11,"Demi Westfall","Field West","Account Executive","Ramsey Weber",1],[11,"Derek Smith","Inside","Business Development","Ben Renner",2],[11,"Desiree Campbell","Inside","Account Executive","Kait Hoff-Sojda",7],[11,"Donald Burbach","Field East","Account Executive","Ian McDonald",3],[11,"Dylan Lawrence","Field East","Account Executive","Rebecca Jenkins",2],[11,"Emily Bassett","Field East","Account Executive","Andrew Pelc",2],[11,"Eric Ideman","Field West","Account Executive","Kelly Chapman",1],[11,"Gabriella Price","Field East","Account Executive","Kevin Lerner",1],[11,"Gene Werley","Inside","Account Executive","Matt Wick",4],[11,"Gerard Bednash","Field East","Account Executive","Ian McDonald",1],[11,"Hannah McAlister","Inside","Account Executive","Angela Kleinman",6],[11,"JJ Sciacca","Field East","Account Executive","Rebecca Jenkins",1],[11,"Jacob Galonska","Majors","Account Executive","Evan Ross",4],[11,"James Roberts","Inside","Business Development","Tim Philbin",3],[11,"Jeff Topor","Field West","Account Executive","John Kitson",2],[11,"Jeffrey Fickes","Field East","Account Executive","Kevin Lerner",1],[11,"Jenna Paoletti","Field East","Account Executive","Andrew Pelc",2],[11,"Jennifer Arboleda","Inside","Account Executive","Kim Gilliam",6],[11,"Jenny Aburto","Field East","Account Executive","Andrew Pelc",2],[11,"John Russell","Inside","Business Development","Tim Philbin",3],[11,"Jordan Gedik","Majors","Account Executive","Evan Ross",2],[11,"Jory Leaver","Inside","Business Development","Ben Renner",4],[11,"Joseph Benjoya","Inside","Account Executive","Kimberly Norman",7],[11,"Joseph Loan","Field East","Account Executive","Rebecca Jenkins",1],[11,"Joshua Chirayil","Inside","Account Executive","Kimberly Norman",7],[11,"Julia Zayed","Inside","Account Executive","Kait Hoff-Sojda",3],[11,"Justin Tuttle","Field East","Client Partner","John David Scozzaro",2],[11,"Kamani Smith","Inside","Account Executive","Angela Kleinman",6],[11,"Karen (Dean) Bowling","Field West","Account Executive","John Kitson",4],[11,"Kari Gibbons","Inside","Account Executive","Kait Hoff-Sojda",3],[11,"Kegan Portillo","Inside","Account Executive","Matt Wick",6],[11,"Kendal Williams","Inside","Account Executive","Angela Kleinman",4],[11,"Kenya Alvarez","Field East","Account Executive","John David Scozzaro",6],[11,"Kyle Bubak","Field East","Account Executive","Andrew Pelc",3],[11,"Kyle Spilsbury","Inside","Account Executive","Matt Wick",5],[11,"Lauren Hughes","Field East","Account Executive","Andrew Pelc",2],[11,"Lauren Szara","Inside","Account Executive","Matt Wick",3],[11,"Lisa Rubin","Inside","Business Development","Tim Philbin",6],[11,"Lois Windsor","Field East","Account Executive","Rebecca Jenkins",2],[11,"Madyson Lawrence","Field East","Client Partner","Andrew Pelc",2],[11,"Marissa Cannato","Field West","Account Executive","John Kitson",3],[11,"Mark Baum","Field East","Account Executive","Rebecca Jenkins",2],[11,"Matt Cumbow","Field East","Client Partner","John David Scozzaro",2],[11,"Melissa Ott","Inside","Account Executive","Angela Kleinman",4],[11,"Melissa Shelbrick","Inside","Account Executive","Kim Gilliam",1],[11,"Melody Stapleton","Field East","Account Executive","Kevin Lerner",3],[11,"Michael Guerrini","Field East","Account Executive","Ian McDonald",4],[11,"Michael Kruse","AccuTrade","AccuTrade","Grant Goering",2],[11,"Michael Murphy","Field East","Account Executive","Ian McDonald",1],[11,"Michael Schroeder","Majors","Account Executive","Damien Mollere",1],[11,"Michael Schweinbeck","Inside","Account Executive","Kait Hoff-Sojda",2],[11,"Michelle McKenna","Field East","Client Partner","John David Scozzaro",2],[11,"Mikal Slatton","Inside","Account Executive","Kim Gilliam",6],[11,"Mike Egan","Field East","Client Partner","Jay Boehm",2],[11,"Mohammad Alam","Field East","Client Partner","Jay Boehm",1],[11,"Niall Fenton","Majors","Account Executive","Evan Ross",2],[11,"Nick Walker","Inside","Account Executive","Kim Gilliam",3],[11,"Nicole Sojda","Inside","Account Executive","Angela Kleinman",6],[11,"Ninia Sykes","Inside","Account Executive","Kim Gilliam",3],[11,"Paco Lyman","Inside","Account Executive","Matt Wick",1],[11,"Patrick Scarborough","Field East","Account Executive","Rebecca Jenkins",1],[11,"Patrycja Ferenc","Inside","Account Executive","Kimberly Norman",5],[11,"Paul Craig","Inside","Account Executive","Kim Gilliam",6],[11,"Paul Madeano","Field West","Account Executive","John Kitson",7],[11,"Ryan Altier","Field East","Client Partner","Ryan Kwasneski",2],[11,"Sadie Svitenko","Field East","Account Executive","John David Scozzaro",5],[11,"Samantha Biafore","Inside","Business Development","Tim Philbin",1],[11,"Sean Eager","Field East","Account Executive","Rebecca Jenkins",3],[11,"Shalise Curry","Inside","Business Development","Ben Renner",1],[11,"Shane King","Field East","Account Executive","Andrew Pelc",7],[11,"Shannon Boone","Inside","Business Development","Ben Renner",3],[11,"Sharla Koob","Field East","Account Executive","John David Scozzaro",2],[11,"Sharon Cunane","Majors","Account Executive","Patti White",3],[11,"Shelby Hill","Field East","Account Executive","Rebecca Jenkins",1],[11,"Shelley Rutherford","Field East","Client Partner","Andrew Pelc",2],[11,"Shelly Keith","Field East","Account Executive","Andrew Pelc",2],[11,"Steve Williams","Inside","Business Development","Ben Renner",7],[11,"Steven Bauer","AccuTrade","AccuTrade","Katie Van",2],[11,"Steven Gerchen","Majors","Account Executive","Evan Ross",2],[11,"Teddy Blumberg","Majors","Account Executive","Evan Ross",6],[11,"Tora Rumowski","Inside","Account Executive","Kimberly Norman",6],[11,"Tyler Morrissey","Field East","Account Executive","John David Scozzaro",2],[11,"Waverly Jordan","Inside","Business Development","Tim Philbin",3]];
+
+// Weekly totals (precomputed)
+const WEEKLY_STATS = [
+  {week:'Apr 2', total:154, invalid:84, overdue:104, pipeline:136, eae:14, multi:134},
+  {week:'Apr 9', total:96, invalid:42, overdue:30, pipeline:90, eae:6, multi:61},
+  {week:'Apr 16', total:114, invalid:41, overdue:24, pipeline:77, eae:0, multi:27},
+  {week:'Apr 23', total:92, invalid:30, overdue:18, pipeline:62, eae:0, multi:17},
+  {week:'May 6', total:132, invalid:17, overdue:78, pipeline:108, eae:0, multi:67},
+  {week:'May 14', total:103, invalid:19, overdue:52, pipeline:74, eae:0, multi:40},
+  {week:'May 22', total:94, invalid:28, overdue:36, pipeline:73, eae:0, multi:38},
+  {week:'May 28', total:95, invalid:23, overdue:40, pipeline:56, eae:0, multi:20},
+  {week:'Jun 11', total:119, invalid:68, overdue:69, pipeline:93, eae:0, multi:82},
+  {week:'Jun 19', total:109, invalid:60, overdue:59, pipeline:84, eae:0, multi:78},
+  {week:'Jun 26', total:91, invalid:48, overdue:48, pipeline:32, multi:31, eae:0},
+  {week:'Jul 6', total:110, invalid:47, overdue:78, pipeline:38, multi:44, eae:0},
+];
+
+// Never-flagged reps [name, channel, role, manager]
+const NEVER_FLAGGED = [["Nina Maric","Field West","Account Executive","Kelly Chapman"],["Cherise Reynolds","Field West","Account Executive","Nicholas Tomshack"],["Kevin Crosby","AccuTrade","AccuTrade","Grant Goering"],["Heather Hansel","AccuTrade","AccuTrade","Grant Goering"],["Taki Caranicolas","AccuTrade","AccuTrade","Grant Goering"],["Grant Luker","AccuTrade","AccuTrade","Grant Goering"],["Trevor Wilharm","AccuTrade","AccuTrade","Grant Goering"],["Rajat Singh","AccuTrade","AccuTrade","Grant Goering"],["Craig Kutchey","AccuTrade","AccuTrade","Grant Goering"],["Tracy Traynor","AccuTrade","AccuTrade","Katie Van"],["Justin Glass","AccuTrade","AccuTrade","Katie Van"],["Ryan Mayo","AccuTrade","AccuTrade","Katie Van"],["Andrew West","AccuTrade","AccuTrade","Katie Van"],["Kevin Kirschner","AccuTrade","AccuTrade","Katie Van"],["Edgar Mendoza","AccuTrade","AccuTrade","Katie Van"],["Heru Scott","Inside","Business Development","Kait Hoff-Sojda"],["Donnell Fields","Inside","Business Development","Kait Hoff-Sojda"],["Barrett Morrill","Client Partner","Client Partner","Andrew Pelc"],["Nikki Dennison","Client Partner","Client Partner","Andrew Pelc"],["Al Giamarino","Field East","Client Partner","John David Scozzaro"],["Clinton Estell","Field East","Client Partner","John David Scozzaro"],["Jacob Crawley","Majors","Account Executive","Patti White"],["Paige Grosvenor","Majors","Account Executive","Peter Mosca"]];
+
+// ─── STATE ──────────────────────────────────────────────────────────────────
+let currentTab = 'overview';
+let trendView = 'risk'; // 'risk' | 'improving' | 'all'
+let sortKey = 'rep', sortDir = 1;
+let currentPage = 1;
+const PAGE_SIZE = 50;
+let charts = {};
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+function flagBits(f) {
+  return { inv: !!(f&1), ov: !!(f&2), pipe: !!(f&4), eae: !!(f&8) };
+}
+function flagCount(f) { return [1,2,4,8].filter(b=>f&b).length; }
+
+function getFiltered() {
+  const wk = document.getElementById('filterWeek').value;
+  const ch = document.getElementById('filterChannel').value;
+  const ro = document.getElementById('filterRole').value;
+  const mg = document.getElementById('filterManager').value;
+  const rp = (document.getElementById('filterRep').value||'').toLowerCase();
+
+  return RAW.filter(r => {
+    if (wk !== 'all' && r[0] !== parseInt(wk)) return false;
+    if (ch !== 'all' && r[2] !== ch) return false;
+    if (ro !== 'all' && r[3] !== ro) return false;
+    if (mg !== 'all' && r[4] !== mg) return false;
+    if (rp && !r[1].toLowerCase().includes(rp)) return false;
+    return true;
+  });
+}
+
+function computeKPIs(rows) {
+  const total = rows.length;
+  const invalid = rows.filter(r => r[5]&1).length;
+  const overdue = rows.filter(r => r[5]&2).length;
+  const pipeline = rows.filter(r => r[5]&4||r[5]&8).length;
+  const multi = rows.filter(r => flagCount(r[5]) >= 2).length;
+  return {total, invalid, overdue, pipeline, multi};
+}
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+function init() {
+  // Populate manager dropdown
+  const DEPARTED_MANAGERS = new Set(['Alison Workman','Heather Johnson','Jessica Smith','Katie Meyer']);
+  const managers = [...new Set(RAW.map(r=>r[4]).filter(m=>m&&m!=='None'&&m!==''&&!DEPARTED_MANAGERS.has(m)))].sort();
+  const mgSel = document.getElementById('filterManager');
+  managers.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m; o.textContent = m;
+    mgSel.appendChild(o);
+  });
+
+  ['filterWeek','filterChannel','filterRole','filterManager'].forEach(id => {
+    document.getElementById(id).addEventListener('change', onFilterChange);
+  });
+  document.getElementById('filterRep').addEventListener('input', onFilterChange);
+
+  render();
+  buildTrendCharts();
+  updateBanner();
+}
+
+function onFilterChange() { currentPage = 1; updateBanner(); render(); }
+
+function updateBanner() {
+  const ch = document.getElementById('filterChannel').value;
+  const ro = document.getElementById('filterRole').value;
+  const banner = document.getElementById('contextBanner');
+  const text = document.getElementById('contextBannerText');
+
+  const isCP = ch === 'Client Partner' || ro === 'Client Partner';
+  const isAT = ch === 'AccuTrade' || ro === 'AccuTrade';
+
+  if (isCP || isAT) {
+    text.innerHTML = 'The AccuTrade and Client Partner teams are measured for Overdue Opportunities only — Invalid Opps and Pipeline Coverage flags do not apply to this group. They were first included in compliance reporting on May 6, 2026.';
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+function resetFilters() {
+  document.getElementById('filterWeek').value = '5';
+  document.getElementById('filterChannel').value = 'all';
+  document.getElementById('filterRole').value = 'all';
+  document.getElementById('filterManager').value = 'all';
+  document.getElementById('filterRep').value = '';
+  currentPage = 1;
+  updateBanner();
+  render();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  const tabs = ['overview','trends','reps','managers','rep-trends'];
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  render();
+  if (tab === 'trends') buildFullTrendChart();
+}
+
+function render() {
+  const rows = getFiltered();
+  if (currentTab === 'overview') renderOverview(rows);
+  if (currentTab === 'reps') renderReps(rows);
+  if (currentTab === 'managers') renderManagers(rows);
+  if (currentTab === 'trends') renderTrendTable();
+  if (currentTab === 'rep-trends') renderRepTrends();
+}
+
+// ─── OVERVIEW ───────────────────────────────────────────────────────────────
+function renderOverview(rows) {
+  renderKPIs(rows);
+  renderTrendChart(rows);
+  renderChannelChart(rows);
+  renderRoleChart(rows);
+}
+
+function renderKPIs(rows) {
+  const k = computeKPIs(rows);
+  const wk = document.getElementById('filterWeek').value;
+  // Previous week for delta
+  let prev = null;
+  if (wk !== 'all' && parseInt(wk) > 0) {
+    const prevWk = parseInt(wk) - 1;
+    const prevRows = RAW.filter(r => {
+      const ch = document.getElementById('filterChannel').value;
+      const ro = document.getElementById('filterRole').value;
+      const mg = document.getElementById('filterManager').value;
+      if (r[0] !== prevWk) return false;
+      if (ch !== 'all' && r[2] !== ch) return false;
+      if (ro !== 'all' && r[3] !== ro) return false;
+      if (mg !== 'all' && r[4] !== mg) return false;
+      return true;
+    });
+    prev = computeKPIs(prevRows);
+  }
+
+  function delta(cur, prv, field) {
+    if (!prv) return '';
+    const d = cur[field] - prv[field];
+    if (d === 0) return '<span class="delta-flat">— same</span>';
+    if (d > 0) return `<span class="delta-pos">▲ ${d} vs prior week</span>`;
+    return `<span class="delta-neg">▼ ${Math.abs(d)} vs prior week</span>`;
+  }
+
+  document.getElementById('kpiGrid').innerHTML = `
+    <div class="kpi-card total">
+      <div class="kpi-label">Total flagged</div>
+      <div class="kpi-value">${k.total}</div>
+      <div class="kpi-delta">${delta(k,prev,'total')}</div>
+    </div>
+    <div class="kpi-card invalid">
+      <div class="kpi-label">Invalid opps</div>
+      <div class="kpi-value">${k.invalid}</div>
+      <div class="kpi-delta">${delta(k,prev,'invalid')}</div>
+    </div>
+    <div class="kpi-card overdue">
+      <div class="kpi-label">Overdue opps</div>
+      <div class="kpi-value">${k.overdue}</div>
+      <div class="kpi-delta">${delta(k,prev,'overdue')}</div>
+    </div>
+    <div class="kpi-card pipeline">
+      <div class="kpi-label">Pipeline coverage</div>
+      <div class="kpi-value">${k.pipeline}</div>
+      <div class="kpi-delta">${delta(k,prev,'pipeline')}</div>
+    </div>
+    <div class="kpi-card multi">
+      <div class="kpi-label">Multi-flag</div>
+      <div class="kpi-value">${k.multi}</div>
+      <div class="kpi-delta">${delta(k,prev,'multi')}</div>
+    </div>
+  `;
+}
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function renderTrendChart(rows) {
+  destroyChart('trend');
+  const wk = document.getElementById('filterWeek').value;
+
+  // Build weekly filtered data
+  const ch = document.getElementById('filterChannel').value;
+  const ro = document.getElementById('filterRole').value;
+  const mg = document.getElementById('filterManager').value;
+
+  const wData = WEEKS.map((w,i) => {
+    const wRows = RAW.filter(r => {
+      if (r[0] !== i) return false;
+      if (ch !== 'all' && r[2] !== ch) return false;
+      if (ro !== 'all' && r[3] !== ro) return false;
+      if (mg !== 'all' && r[4] !== mg) return false;
+      return true;
+    });
+    return computeKPIs(wRows);
+  });
+
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  charts['trend'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: WEEKS,
+      datasets: [
+        { label:'Total', data: wData.map(d=>d.total), borderColor:'#2B093C', backgroundColor:'rgba(43,9,60,0.06)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#2B093C', tension:0.3, fill:true },
+        { label:'Overdue', data: wData.map(d=>d.overdue), borderColor:'#2980B9', backgroundColor:'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#2980B9', borderDash:[4,3], tension:0.3 },
+        { label:'Pipeline', data: wData.map(d=>d.pipeline), borderColor:'#27AE60', backgroundColor:'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#27AE60', borderDash:[2,4], tension:0.3 },
+        { label:'Invalid', data: wData.map(d=>d.invalid), borderColor:'#C0392B', backgroundColor:'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'#C0392B', borderDash:[6,2], tension:0.3 },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y}`}} },
+      scales:{
+        x:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#6B6080',font:{size:11}}},
+        y:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#6B6080',font:{size:11}}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+function renderChannelChart(rows) {
+  destroyChart('channel');
+  const channels = ['Field West','Field East','Inside','Majors','Client Partner','AccuTrade'];
+  const data = channels.map(ch => rows.filter(r=>r[2]===ch).length);
+  const ctx = document.getElementById('channelChart').getContext('2d');
+  charts['channel'] = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: channels,
+      datasets:[{ label:'Flagged reps', data, backgroundColor:['#2B093C','#4D2080','#65289D','#4D73D4','#9B59B6','#C0392B'], borderRadius:5 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:'#6B6080',font:{size:11}}},
+        y:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#6B6080',font:{size:11}}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+function renderRoleChart(rows) {
+  destroyChart('role');
+  const roles = ['Account Executive','Business Development','Client Partner','AccuTrade'];
+  const data = roles.map(ro => rows.filter(r=>r[3]===ro).length);
+  const ctx = document.getElementById('roleChart').getContext('2d');
+  charts['role'] = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: ['AE','BD','CP','AT'],
+      datasets:[{ label:'Flagged reps', data, backgroundColor:['#2B093C','#65289D','#4D73D4','#C0392B'], borderRadius:5 }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:'#6B6080',font:{size:11}}},
+        y:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#6B6080',font:{size:11}}, beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ─── TRENDS ─────────────────────────────────────────────────────────────────
+function buildTrendCharts() {
+  // Build on first visit
+}
+
+let fullChartBuilt = false;
+function buildFullTrendChart() {
+  if (fullChartBuilt) { destroyChart('fullTrend'); }
+  fullChartBuilt = true;
+  destroyChart('fullTrend');
+  const ctx = document.getElementById('fullTrendChart').getContext('2d');
+  charts['fullTrend'] = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: WEEKLY_STATS.map(d=>d.week),
+      datasets:[
+        { label:'Total', data:WEEKLY_STATS.map(d=>d.total), borderColor:'#2B093C', backgroundColor:'rgba(43,9,60,0.06)', borderWidth:2.5, pointRadius:4, pointBackgroundColor:'#2B093C', tension:0.3, fill:true },
+        { label:'Pipeline', data:WEEKLY_STATS.map(d=>d.pipeline), borderColor:'#27AE60', backgroundColor:'transparent', borderWidth:2, pointRadius:3.5, pointBackgroundColor:'#27AE60', borderDash:[4,3], tension:0.3 },
+        { label:'Overdue', data:WEEKLY_STATS.map(d=>d.overdue), borderColor:'#2980B9', backgroundColor:'transparent', borderWidth:2, pointRadius:3.5, pointBackgroundColor:'#2980B9', borderDash:[3,3], tension:0.3 },
+        { label:'Invalid', data:WEEKLY_STATS.map(d=>d.invalid), borderColor:'#C0392B', backgroundColor:'transparent', borderWidth:2, pointRadius:3.5, pointBackgroundColor:'#C0392B', borderDash:[6,2], tension:0.3 },
+        { label:'Multi-flag', data:WEEKLY_STATS.map(d=>d.multi), borderColor:'#8E44AD', backgroundColor:'transparent', borderWidth:1.5, pointRadius:3, pointBackgroundColor:'#8E44AD', borderDash:[2,5], tension:0.3 },
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.parsed.y} reps`}}},
+      scales:{
+        x:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#6B6080',font:{size:12}}},
+        y:{grid:{color:'rgba(0,0,0,0.05)'}, ticks:{color:'#6B6080',font:{size:12}}, beginAtZero:true, suggestedMax:170}
+      }
+    }
+  });
+}
+
+function renderTrendTable() {
+  const rows = WEEKLY_STATS.map((s,i) => {
+    const prev = i > 0 ? WEEKLY_STATS[i-1] : null;
+    function d(field) {
+      if (!prev) return '<span class="delta-flat">—</span>';
+      const v = s[field] - prev[field];
+      if (v===0) return '<span class="delta-flat">—</span>';
+      if (v>0) return `<span class="delta-pos">+${v}</span>`;
+      return `<span class="delta-neg">${v}</span>`;
+    }
+    const isLatest = i === WEEKLY_STATS.length-1;
+    return `<tr${isLatest?' class="latest"':''}>
+      <td>${s.week}${isLatest?' <small style="color:var(--bv);font-weight:400">latest</small>':''}</td>
+      <td>${s.total} ${d('total')}</td>
+      <td>${s.invalid} ${d('invalid')}</td>
+      <td>${s.overdue} ${d('overdue')}</td>
+      <td>${s.pipeline} ${d('pipeline')}</td>
+      <td>${s.multi} ${d('multi')}</td>
+    </tr>`;
+  });
+  document.getElementById('trendTable').innerHTML = `
+    <thead><tr>
+      <th>Week</th><th>Total flagged</th><th>Invalid opps</th><th>Overdue opps</th><th>Pipeline</th><th>Multi-flag</th>
+    </tr></thead>
+    <tbody>${rows.join('')}</tbody>`;
+}
+
+// ─── REPS TABLE ─────────────────────────────────────────────────────────────
+function sortTable(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  currentPage = 1;
+  renderReps(getFiltered());
+}
+
+function renderReps(rows) {
+  const sorted = [...rows].sort((a,b) => {
+    let av, bv;
+    if (sortKey==='rep') { av=a[1]; bv=b[1]; }
+    else if (sortKey==='week') { av=a[0]; bv=b[0]; }
+    else if (sortKey==='channel') { av=a[2]; bv=b[2]; }
+    else if (sortKey==='role') { av=a[3]; bv=b[3]; }
+    else if (sortKey==='manager') { av=a[4]; bv=b[4]; }
+    else if (sortKey==='count') { av=flagCount(a[5]); bv=flagCount(b[5]); }
+    else { av=a[1]; bv=b[1]; }
+    if (av < bv) return -sortDir;
+    if (av > bv) return sortDir;
+    return 0;
+  });
+
+  const total = sorted.length;
+  const pages = Math.ceil(total / PAGE_SIZE);
+  const start = (currentPage-1)*PAGE_SIZE;
+  const pageRows = sorted.slice(start, start+PAGE_SIZE);
+
+  document.getElementById('repCount').textContent = `${total} records`;
+
+  const tbody = document.getElementById('repBody');
+  tbody.innerHTML = pageRows.map(r => {
+    const f = r[5];
+    const pills = [
+      (f&1)?'<span class="pill inv">Invalid</span>':'',
+      (f&2)?'<span class="pill ov">Overdue</span>':'',
+      (f&4)?'<span class="pill pipe">Pipeline</span>':'',
+      (f&8)?'<span class="pill pipe">EAE Pipeline</span>':'',
+    ].join('');
+    const fc = flagCount(f);
+    const multiPill = fc >= 2 ? '<span class="pill multi">Multi</span>' : '';
+    return `<tr>
+      <td><strong>${r[1]}</strong></td>
+      <td><span class="week-tag">${WEEKS[r[0]]}</span></td>
+      <td><span class="channel-tag">${r[2]}</span></td>
+      <td>${r[3]}</td>
+      <td>${r[4]||'—'}</td>
+      <td>${pills}</td>
+      <td><span class="flag-count">${fc} ${multiPill}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('pageInfo').textContent = `${start+1}–${Math.min(start+PAGE_SIZE, total)} of ${total}`;
+
+  // Page buttons
+  const btnDiv = document.getElementById('pageBtns');
+  let btns = '';
+  btns += `<button class="page-btn" onclick="changePage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  const range = [];
+  for (let i=1;i<=pages;i++) {
+    if (i===1||i===pages||Math.abs(i-currentPage)<=2) range.push(i);
+    else if (range[range.length-1]!=='…') range.push('…');
+  }
+  range.forEach(p => {
+    if (p==='…') btns += `<button class="page-btn" disabled>…</button>`;
+    else btns += `<button class="page-btn ${p===currentPage?'active':''}" onclick="changePage(${p})">${p}</button>`;
+  });
+  btns += `<button class="page-btn" onclick="changePage(${currentPage+1})" ${currentPage===pages?'disabled':''}>›</button>`;
+  btnDiv.innerHTML = btns;
+
+  // Update sort arrows
+  document.querySelectorAll('.data-table th').forEach(th => {
+    th.classList.remove('sorted');
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = '↕';
+  });
+}
+
+function changePage(p) {
+  const rows = getFiltered();
+  const pages = Math.ceil(rows.length / PAGE_SIZE);
+  if (p < 1 || p > pages) return;
+  currentPage = p;
+  renderReps(rows);
+}
+
+// ─── MANAGERS ───────────────────────────────────────────────────────────────
+function renderManagers(rows) {
+  const byMgr = {};
+  rows.forEach(r => {
+    const m = r[4]||'(no manager)';
+    if (!byMgr[m]) byMgr[m] = [];
+    byMgr[m].push(r);
+  });
+
+  const maxReps = Math.max(...Object.values(byMgr).map(rs=>rs.length));
+
+  const sorted = Object.entries(byMgr).sort((a,b) => b[1].length - a[1].length);
+
+  document.getElementById('managerGrid').innerHTML = sorted.map(([mgr, reps]) => {
+    const inv = reps.filter(r=>r[5]&1).length;
+    const ov = reps.filter(r=>r[5]&2).length;
+    const pipe = reps.filter(r=>r[5]&4||r[5]&8).length;
+    const multi = reps.filter(r=>flagCount(r[5])>=2).length;
+    const pct = n => Math.round(n/reps.length*100);
+    const w = n => Math.round(n/Math.max(1,reps.length)*100);
+
+    const repList = [...new Set(reps.map(r=>r[1]))].sort();
+    const repItems = repList.map(rep => {
+      const repRows = reps.filter(r=>r[1]===rep);
+      const flags = repRows.map(r=>r[5]).reduce((a,b)=>a|b,0);
+      const fc = flagCount(flags);
+      const fStr = [
+        (flags&1)?'Inv':'',
+        (flags&2)?'OD':'',
+        (flags&4||flags&8)?'Pipe':''
+      ].filter(Boolean).join(', ');
+      return `<div class="manager-rep"><strong>${rep}</strong><span>${fStr}</span></div>`;
+    }).join('');
+
+    return `<div class="manager-card" onclick="toggleManager(this)">
+      <div class="manager-name">${mgr}</div>
+      <div class="manager-stats">
+        <span class="manager-stat"><span>${reps.length}</span> flagged</span>
+        <span class="manager-stat"><span>${inv}</span> inv</span>
+        <span class="manager-stat"><span>${ov}</span> overdue</span>
+        <span class="manager-stat"><span>${pipe}</span> pipeline</span>
+      </div>
+      <div class="manager-bars">
+        <div class="manager-bar-row">
+          <div class="manager-bar-label">Invalid</div>
+          <div class="manager-bar-track"><div class="manager-bar-fill" style="width:${w(inv)}%;background:var(--inv)"></div></div>
+          <div style="font-size:10px;color:var(--muted);width:24px;text-align:right">${inv}</div>
+        </div>
+        <div class="manager-bar-row">
+          <div class="manager-bar-label">Overdue</div>
+          <div class="manager-bar-track"><div class="manager-bar-fill" style="width:${w(ov)}%;background:var(--ov)"></div></div>
+          <div style="font-size:10px;color:var(--muted);width:24px;text-align:right">${ov}</div>
+        </div>
+        <div class="manager-bar-row">
+          <div class="manager-bar-label">Pipeline</div>
+          <div class="manager-bar-track"><div class="manager-bar-fill" style="width:${w(pipe)}%;background:var(--pipe)"></div></div>
+          <div style="font-size:10px;color:var(--muted);width:24px;text-align:right">${pipe}</div>
+        </div>
+      </div>
+      <div class="manager-rep-list">${repItems}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleManager(card) {
+  card.classList.toggle('expanded');
+}
+
+function toggleLegend() {
+  const panel = document.getElementById('legendPanel');
+  const arrow = document.getElementById('legendArrow');
+  const isOpen = panel.style.display === 'block';
+  panel.style.display = isOpen ? 'none' : 'block';
+  arrow.textContent = isOpen ? '▶' : '▼';
+}
+
+// ─── REP TRENDS ─────────────────────────────────────────────────────────────
+function setTrendView(view) {
+  trendView = view;
+  document.querySelectorAll('.trend-toggle').forEach(b => b.classList.remove('active'));
+  const map = {risk:'toggleAtRisk', improving:'toggleImproving', monitoring:'toggleMonitoring', all:'toggleAll', clean:'toggleClean'};
+  document.getElementById(map[view]).classList.add('active');
+  renderRepTrends();
+}
+
+function computeRepProfiles() {
+  // Apply channel/role/manager filters but NOT week filter — trends need all weeks
+  const ch = document.getElementById('filterChannel').value;
+  const ro = document.getElementById('filterRole').value;
+  const mg = document.getElementById('filterManager').value;
+  const rp = (document.getElementById('filterRep').value||'').toLowerCase();
+
+  const byRep = {};
+  RAW.forEach(r => {
+    if (ch !== 'all' && r[2] !== ch) return;
+    if (ro !== 'all' && r[3] !== ro) return;
+    if (mg !== 'all' && r[4] !== mg) return;
+    if (rp && !r[1].toLowerCase().includes(rp)) return;
+    if (!byRep[r[1]]) byRep[r[1]] = { rep: r[1], channel: r[2], role: r[3], manager: r[4], weeks: {} };
+    byRep[r[1]].weeks[r[0]] = r[5];
+  });
+
+  const TOTAL_WEEKS = WEEKS.length; // dynamic — updates automatically as weeks are added
+  const RECENT = Array.from({length: 3}, (_, i) => TOTAL_WEEKS - 3 + i); // last 3 weeks
+  const EARLY = Array.from({length: 3}, (_, i) => i); // first 3 weeks
+
+  return Object.values(byRep).map(rep => {
+    const weekIdxs = Object.keys(rep.weeks).map(Number);
+    const totalAppearances = weekIdxs.length;
+
+    // Early vs recent appearances
+    const earlyCount = EARLY.filter(w => rep.weeks[w] !== undefined).length;
+    const recentCount = RECENT.filter(w => rep.weeks[w] !== undefined).length;
+
+    // Consecutive recent streak (last N weeks in a row)
+    let streak = 0;
+    for (let i = TOTAL_WEEKS - 1; i >= 0; i--) {
+      if (rep.weeks[i] !== undefined) streak++;
+      else break;
+    }
+
+    // Flag variety across all appearances
+    let allFlags = 0;
+    weekIdxs.forEach(w => { allFlags |= rep.weeks[w]; });
+    const flagVariety = [1,2,4,8].filter(b => allFlags & b).length;
+
+    // Multi-flag weeks
+    const multiWeeks = weekIdxs.filter(w => [1,2,4,8].filter(b=>rep.weeks[w]&b).length >= 2).length;
+
+    // Trend direction score: negative = improving, positive = worsening
+    // Weight: recent appearances more heavily
+    const trendScore = (recentCount * 2) - (earlyCount * 2) + (streak >= 3 ? 3 : 0) + (multiWeeks >= 3 ? 2 : 0) + (flagVariety >= 3 ? 1 : 0);
+
+    // Classification
+    let classification;
+    if (totalAppearances <= 2 && recentCount === 0) {
+      classification = 'improving';
+    } else if (totalAppearances >= 4 && recentCount >= 2 && (multiWeeks >= 2 || streak >= 3)) {
+      classification = 'risk';
+    } else if (recentCount === 0 && earlyCount >= 2) {
+      classification = 'improving';
+    } else if (recentCount >= 2 && recentCount >= earlyCount) {
+      classification = 'risk';
+    } else if (recentCount < earlyCount && totalAppearances >= 3) {
+      classification = 'improving';
+    } else {
+      classification = 'neutral';
+    }
+
+    return { ...rep, totalAppearances, earlyCount, recentCount, streak, flagVariety, multiWeeks, trendScore, classification };
+  });
+}
+
+function renderRepTrends() {
+  const WEEK_LABELS = ['4/2','4/9','4/16','4/23','5/6','5/14','5/22','5/28','6/11','6/19','6/26','7/6'];
+
+  // Handle clean record view separately
+  if (trendView === 'clean') {
+    const ch = document.getElementById('filterChannel').value;
+    const ro = document.getElementById('filterRole').value;
+    const mg = document.getElementById('filterManager').value;
+    const rp = (document.getElementById('filterRep').value||'').toLowerCase();
+
+    const filtered = NEVER_FLAGGED.filter(r => {
+      if (ch !== 'all' && r[1] !== ch) return false;
+      if (ro !== 'all' && r[2] !== ro) return false;
+      if (mg !== 'all' && r[3] !== mg) return false;
+      if (rp && !r[0].toLowerCase().includes(rp)) return false;
+      return true;
+    }).sort((a,b) => a[0].localeCompare(b[0]));
+
+    const cards = filtered.map(r => `
+      <div class="rep-trend-card clean">
+        <div class="trend-badge clean">★ Clean record</div>
+        <div class="rep-trend-name">${r[0]}</div>
+        <div class="rep-trend-meta">${r[2]} · ${r[1]} · ${r[3]||'—'}</div>
+        <div style="margin-top:10px; font-size:12px; color:var(--muted); background:var(--bg); border-radius:6px; padding:8px 10px;">
+          Has not appeared on the compliance report across all ${WEEKS.length} weeks tracked.
+        </div>
+        <div style="margin-top:8px;">
+          <span class="trend-stat-pill"><strong style="color:#1A4FAF;">0</strong>/${WEEKS.length} weeks flagged</span>
+        </div>
+      </div>`).join('');
+
+    const grid = document.getElementById('repTrendGrid');
+    grid.className = 'rep-trend-grid';
+    grid.innerHTML = cards.length
+      ? cards
+      : `<div class="no-results-msg">No reps match this filter combination.</div>`;
+    return;
+  }
+
+  const profiles = computeRepProfiles();
+  let filtered;
+  if (trendView === 'risk') {
+    filtered = profiles.filter(p => p.classification === 'risk').sort((a,b) => b.trendScore - a.trendScore);
+  } else if (trendView === 'improving') {
+    filtered = profiles.filter(p => p.classification === 'improving').sort((a,b) => a.trendScore - b.trendScore);
+  } else if (trendView === 'monitoring') {
+    filtered = profiles.filter(p => p.classification === 'neutral').sort((a,b) => b.totalAppearances - a.totalAppearances);
+  } else {
+    // All reps: flagged profiles + clean record reps
+    const ch = document.getElementById('filterChannel').value;
+    const ro = document.getElementById('filterRole').value;
+    const mg = document.getElementById('filterManager').value;
+    const rp = (document.getElementById('filterRep').value||'').toLowerCase();
+
+    const cleanProfiles = NEVER_FLAGGED
+      .filter(r => {
+        if (ch !== 'all' && r[1] !== ch) return false;
+        if (ro !== 'all' && r[2] !== ro) return false;
+        if (mg !== 'all' && r[3] !== mg) return false;
+        if (rp && !r[0].toLowerCase().includes(rp)) return false;
+        return true;
+      })
+      .map(r => ({
+        rep: r[0], channel: r[1], role: r[2], manager: r[3],
+        classification: 'clean', totalAppearances: 0,
+        weeks: {}, trendScore: -999, streak: 0, multiWeeks: 0, flagVariety: 0
+      }));
+
+    filtered = [...profiles.sort((a,b) => b.trendScore - a.trendScore), ...cleanProfiles];
+  }
+
+  const cards = filtered.map(p => {
+    if (p.classification === 'clean') {
+      return `<div class="rep-trend-card clean">
+        <div class="trend-badge clean">★ Clean record</div>
+        <div class="rep-trend-name">${p.rep}</div>
+        <div class="rep-trend-meta">${p.role} · ${p.channel} · ${p.manager||'—'}</div>
+        <div style="margin-top:10px; font-size:12px; color:var(--muted); background:var(--bg); border-radius:6px; padding:8px 10px;">
+          Has not appeared on the compliance report across all ${WEEKS.length} weeks tracked.
+        </div>
+        <div style="margin-top:8px;">
+          <span class="trend-stat-pill"><strong style="color:#1A4FAF;">0</strong>/${WEEKS.length} weeks flagged</span>
+        </div>
+      </div>`;
+    }
+    const badgeClass = p.classification;
+    const badgeLabel = p.classification === 'risk' ? '⚠ Needs attention' : p.classification === 'improving' ? '✓ Moving right direction' : '◉ Monitoring';
+
+    const dots = WEEKS.map((w, i) => {
+      const flags = p.weeks[i];
+      let dotClass, dotText;
+      if (flags === undefined) {
+        dotClass = 'absent'; dotText = '—';
+      } else {
+        const fc = [1,2,4,8].filter(b=>flags&b).length;
+        if (fc >= 2) { dotClass = 'flagged-multi'; dotText = fc; }
+        else { dotClass = 'flagged-single'; dotText = '!'; }
+      }
+      return `<div class="spark-week">
+        <div class="spark-dot ${dotClass}">${dotText}</div>
+        <div class="spark-label">${WEEK_LABELS[i]}</div>
+      </div>`;
+    }).join('');
+
+    let allFlags = 0;
+    Object.values(p.weeks).forEach(f => { allFlags |= f; });
+    const flagTypes = [
+      (allFlags&1)?'<span class="pill inv" style="font-size:10px;padding:1px 6px;">Invalid</span>':'',
+      (allFlags&2)?'<span class="pill ov" style="font-size:10px;padding:1px 6px;">Overdue</span>':'',
+      (allFlags&4||allFlags&8)?'<span class="pill pipe" style="font-size:10px;padding:1px 6px;">Pipeline</span>':'',
+    ].filter(Boolean).join('');
+
+    const lastSeen = Math.max(...Object.keys(p.weeks).map(Number));
+
+    return `<div class="rep-trend-card ${badgeClass}">
+      <div class="trend-badge ${badgeClass}">${badgeLabel}</div>
+      <div class="rep-trend-name">${p.rep}</div>
+      <div class="rep-trend-meta">${p.role} · ${p.channel} · ${p.manager||'—'}</div>
+      <div class="sparkline-row">${dots}</div>
+      <div class="trend-stats">
+        <div class="trend-stat-pill"><strong>${p.totalAppearances}</strong>/${WEEKS.length} weeks</div>
+        <div class="trend-stat-pill">Last seen <strong>${WEEKS[lastSeen]}</strong></div>
+        <div class="trend-stat-pill"><strong>${p.multiWeeks}</strong> multi-flag wk${p.multiWeeks!==1?'s':''}</div>
+        <div class="trend-stat-pill">${p.streak >= 2 ? `<strong style="color:var(--inv)">${p.streak}-wk streak</strong>` : `<strong>${p.streak}</strong> streak`}</div>
+      </div>
+      ${flagTypes ? `<div style="margin-top:8px;">${flagTypes}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const grid = document.getElementById('repTrendGrid');
+  grid.className = 'rep-trend-grid';
+  grid.innerHTML = cards.length
+    ? cards
+    : `<div class="no-results-msg">No reps match this filter combination.</div>`;
+}
+
+// ─── START ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
